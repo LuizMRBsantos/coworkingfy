@@ -184,3 +184,16 @@ Prisma 7 não aceita `url` no schema.prisma.
 A DATABASE_URL fica em prisma.config.ts via defineConfig.datasource.url.
 O schema.prisma tem apenas `provider = "postgresql"` no datasource.
 Nunca adicionar `url = env("DATABASE_URL")` no schema.prisma.
+
+### [Decisão pós Dia 1] Substituir Ticket por ServiceOrder
+O modelo Ticket foi substituído por ServiceOrder (OS) com fluxo de aprovação.
+Motivo: o caso de uso real é gestão de prestadores externos com aprovação do gestor.
+
+Fluxo: DRAFT → PENDING_APPROVAL → APPROVED → IN_PROGRESS → DONE
+       ou REJECTED / CANCELLED em qualquer etapa
+
+Novo modelo necessário: Provider (prestador de serviço externo)
+Campos: nome, especialidade, telefone, email, tipo (RECURRING/PUNCTUAL), status
+
+A migration atual tem o modelo Ticket — amanhã criar nova migration
+substituindo Ticket por ServiceOrder e adicionando Provider.
