@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(**)",
+      "Write(docs/**)",
+      "Write(src/**)",
+      "Write(app/**)",
+      "Write(prisma/**)",
+      "Write(public/**)",
+      "Bash(git *)",
+      "Bash(npm *)",
+      "Bash(npx *)",
+      "Bash(node *)"
+    ],
+    "deny": [
+      "Bash(rm -rf *)",
+      "Bash(sudo *)",
+      "Bash(curl *)",
+      "Bash(wget *)"
+    ]
+  }
+}
