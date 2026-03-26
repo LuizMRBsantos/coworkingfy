@@ -1,13 +1,177 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
-  provider = "prisma-client"
-  output   = "../src/generated/prisma"
+  provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "postgresql"
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum Role {
+  ADMIN
+  RECEPTIONIST
+  MEMBER
+}
+
+enum SpaceType {
+  MEETING_ROOM
+  WORKSTATION
+  COMMON_AREA
+}
+
+enum SpaceStatus {
+  ACTIVE
+  INACTIVE
+  MAINTENANCE
+}
+
+enum BookingStatus {
+  CONFIRMED
+  CANCELLED
+}
+
+enum TicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  DONE
+  CANCELLED
+}
+
+// ---------------------------------------------------------------------------
+// Models
+// ---------------------------------------------------------------------------
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?
+  role          Role      @default(MEMBER)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  bookings         Booking[]
+  ticketsReported  Ticket[]  @relation("TicketReportedBy")
+  ticketsAssigned  Ticket[]  @relation("TicketAssignedTo")
+
+  // NextAuth v5
+  accounts Account[]
+  sessions Session[]
+
+  @@map("users")
+}
+
+model Space {
+  id          String      @id @default(cuid())
+  name        String
+  description String?
+  capacity    Int
+  type        SpaceType
+  status      SpaceStatus @default(ACTIVE)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  bookings Booking[]
+  tickets  Ticket[]
+
+  @@map("spaces")
+}
+
+model Booking {
+  id        String        @id @default(cuid())
+  userId    String
+  spaceId   String
+  startTime DateTime
+  endTime   DateTime
+  status    BookingStatus @default(CONFIRMED)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  user  User  @relation(fields: [userId], references: [id])
+  space Space @relation(fields: [spaceId], references: [id])
+
+  // Índice composto para queries de detecção de conflito de horário
+  @@index([spaceId, startTime, endTime])
+  @@index([userId])
+  @@map("bookings")
+}
+
+model Ticket {
+  id           String         @id @default(cuid())
+  spaceId      String
+  reportedById String
+  assignedToId String?
+  title        String
+  description  String
+  priority     TicketPriority
+  status       TicketStatus   @default(OPEN)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  space      Space @relation(fields: [spaceId], references: [id])
+  reportedBy User  @relation("TicketReportedBy", fields: [reportedById], references: [id])
+  assignedTo User? @relation("TicketAssignedTo", fields: [assignedToId], references: [id])
+
+  @@index([spaceId])
+  @@index([reportedById])
+  @@map("tickets")
+}
+
+// ---------------------------------------------------------------------------
+// NextAuth v5 — modelos obrigatórios
+// ---------------------------------------------------------------------------
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
 }

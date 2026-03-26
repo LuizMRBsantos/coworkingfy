@@ -178,3 +178,9 @@ Usuário: `postgres.swpsofjcrjhfzpamalbv`
 ### [Fase 1] Senha do banco
 Senha com caracteres especiais quebra a DATABASE_URL.
 Solução: usar senha alfanumérica simples.
+
+### [Fase 1] Prisma 7 — configuração do datasource
+Prisma 7 não aceita `url` no schema.prisma.
+A DATABASE_URL fica em prisma.config.ts via defineConfig.datasource.url.
+O schema.prisma tem apenas `provider = "postgresql"` no datasource.
+Nunca adicionar `url = env("DATABASE_URL")` no schema.prisma.
