@@ -1,1 +1,180 @@
-@AGENTS.md
+# CLAUDE.md — Coworkingfy
+
+> Leia este arquivo antes de qualquer ação no projeto.
+> Atualize após cada decisão importante ou obstáculo resolvido.
+
+---
+
+## O projeto
+
+Sistema SaaS de gestão operacional de coworking.
+Sem funcionalidades financeiras de nenhum tipo.
+Referência completa de features e regras de negócio: `docs/IDEA.md`.
+
+## Perfis de usuário
+
+- ADMIN — acesso total
+- RECEPTIONIST — reservas e tickets do dia a dia
+- MEMBER — próprias reservas e abertura de tickets
+
+---
+
+## Stack definida
+
+| Camada | Tecnologia | Versão |
+|---|---|---|
+| Framework | Next.js App Router | 14 |
+| Linguagem | TypeScript | 5 |
+| Estilização | Tailwind CSS | 3 |
+| Componentes | shadcn/ui | latest |
+| ORM | Prisma | 6 |
+| Banco | PostgreSQL via Supabase | — |
+| Autenticação | NextAuth.js | v5 beta |
+| Validação | Zod | 3 |
+| Testes | Vitest + Testing Library | — |
+| CI | GitHub Actions | — |
+
+---
+
+## Estrutura do projeto
+```
+coworkingfy/
+├── .claude/
+│   └── settings.json       ← permissões do agente
+├── .github/
+│   └── workflows/
+│       └── ci.yml          ← pipeline CI
+├── docs/
+│   ├── IDEA.md             ← regras de negócio
+│   ├── CLAUDE.md           ← este arquivo
+│   └── TASKS.md            ← plano completo de tasks
+├── prisma/
+│   └── schema.prisma       ← modelos do banco
+├── src/
+│   ├── app/                ← App Router Next.js
+│   ├── components/         ← componentes React
+│   ├── lib/                ← helpers, db client, auth
+│   ├── tests/              ← testes Vitest
+│   └── types/              ← tipos TypeScript globais
+├── AGENTS.md               ← regras técnicas Next.js
+├── .env                    ← variáveis de ambiente (nunca commitar)
+└── .env.example            ← modelo sem valores reais
+```
+
+---
+
+## Regras de negócio críticas
+
+### Reservas
+- Validação de conflito é obrigatória e deve usar transação atômica no Prisma
+- Espaço com status MAINTENANCE não aceita novas reservas
+- Cancelamento permitido até 2 horas antes (variável: CANCEL_HOURS_BEFORE=2)
+- Duração mínima: 30 minutos
+- Horário de funcionamento: 7h–22h
+
+### Tickets de manutenção
+- Ticket com prioridade HIGH ou URGENT muda espaço para MAINTENANCE automaticamente
+- Fechar ticket (status DONE) volta espaço para ACTIVE automaticamente
+- Usar transação Prisma para garantir atomicidade (ticket + espaço juntos)
+
+### Permissões RBAC
+- Toda rota de API verifica sessão primeiro — retorna 401 se ausente
+- Verifica role segundo — retorna 403 se insuficiente
+- MEMBER só acessa seus próprios dados: userId === session.user.id
+
+---
+
+## Padrões de código
+
+### TypeScript
+- Nunca usar `any` — sempre tipar explicitamente
+- Preferir `interface` para objetos, `type` para unions e primitivos
+
+### Componentes Next.js
+- Server Components por padrão — Client Components só quando necessário
+- Client Components só quando: eventos DOM, useState, useEffect
+- Formulários: react-hook-form + Zod
+
+### API Routes
+- Shape de erro consistente: `{ error: string, code?: string }`
+- Sempre validar body com Zod antes de tocar no banco
+
+### Testes
+- Todo endpoint crítico tem teste de caminho feliz + erro
+- Testar RBAC: MEMBER não acessa rotas de ADMIN
+- Testar conflito de reserva obrigatoriamente
+
+---
+
+## O que NUNCA fazer
+
+- Adicionar funcionalidades financeiras (pagamentos, faturas, mensalidades)
+- Usar `any` no TypeScript
+- Commitar o arquivo `.env`
+- Rodar `npm audit fix --force` sem revisar breaking changes
+- Criar state machines complexas — manter lógica simples e direta
+- Separar backend/frontend em projetos diferentes
+
+---
+
+## Ambiente de desenvolvimento
+
+### Banco de dados
+- Supabase PostgreSQL — região São Paulo (sa-east-1)
+- Usar Session Pooler (não Direct Connection) — rede local é IPv4
+- String de conexão usa porta 5432 via pooler
+- Senha do banco: sem caracteres especiais (@, #, $) para evitar erro de URL encoding
+
+### Comandos do projeto
+```bash
+npm run dev              # servidor local
+npm test                 # rodar testes uma vez
+npm run test:watch       # testes em modo watch
+npm run test:coverage    # cobertura de testes
+npx prisma migrate dev   # nova migration
+npx prisma studio        # visualizar banco
+npx prisma db seed       # popular banco com dados iniciais
+npx prisma generate      # regenerar cliente após schema
+```
+
+### Branches
+```
+main      → código estável, nunca desenvolver aqui
+dev       → integração de features
+feature/* → cada nova funcionalidade
+fix/*     → correções de bugs
+```
+
+---
+
+## Decisões e lições aprendidas
+
+### [Fase 0] Stack escolhida
+Next.js fullstack (App Router) em vez de separar frontend/backend.
+Motivo: reduz complexidade operacional — um repositório, um deploy.
+
+### [Fase 0] Ambiente WSL
+Projeto vive em `/home/luizsantos/projetos/coworkingfy` no Ubuntu/WSL2.
+VSCode conectado ao WSL via extensão Remote WSL.
+Nunca mover o projeto para `/mnt/c/...` — lento e problemático.
+
+### [Fase 0] GitHub — duas contas
+Máquina tem duas contas GitHub (faculdade e pessoal).
+Solução: URL com usuário embutido:
+`https://LuizMRBsantos@github.com/LuizMRBsantos/coworkingfy.git`
+Token com escopos: `repo` + `workflow`.
+
+### [Fase 1] Vulnerabilidades npm audit
+11 vulnerabilidades na instalação do Prisma — todas em devDependencies internas
+(hono, @prisma/dev, lodash). Não afetam produção.
+Decisão: não corrigir agora. Rever quando Prisma lançar versão estável.
+
+### [Fase 1] Conexão Supabase
+Direct Connection (porta 5432) não funciona — rede local usa IPv4.
+Solução: usar Session Pooler.
+Host: `aws-1-sa-east-1.pooler.supabase.com:5432`
+Usuário: `postgres.swpsofjcrjhfzpamalbv`
+
+### [Fase 1] Senha do banco
+Senha com caracteres especiais quebra a DATABASE_URL.
+Solução: usar senha alfanumérica simples.
