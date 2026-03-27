@@ -19,3 +19,11 @@
 ## O que nunca criar
 - Modelos financeiros: Invoice, Payment, Subscription, Plan
 - Campos de cartão de crédito ou dados bancários
+
+### [Dia 2] Arquitetura multi-unidade
+Sistema gerencia 5 unidades: 1 coworking + 4 BTS.
+Modelo Unit adicionado ao schema — tudo se conecta via unitId.
+Coworking: reservas + OS. BTS: só OS e SLA.
+Admin vê todas as unidades. Receptionist vê só a sua.
+Unidades reais: Coworking, Prudential CG, Prudential Dourados,
+Prudential Ipatinga, Stefanini CG

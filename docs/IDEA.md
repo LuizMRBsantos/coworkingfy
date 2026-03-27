@@ -1,103 +1,136 @@
 # IDEA.md — Coworkingfy
 
-## O problema
+## O negócio
 
-O coworking gerencia reservas, equipe e manutenção de forma manual:
-- Reservas chegam pelo WhatsApp sem controle centralizado
-- Conflitos de horário são descobertos na hora
-- Tickets de manutenção se perdem em conversas de grupo
-- Nenhum dado operacional consolidado para decisões
+Dois modelos de operação gerenciados no mesmo sistema:
 
-## A solução
+**Coworking próprio:**
+- 22 salas privativas
+- 40 estações de trabalho
+- 3 salas de reunião
+- Funcionalidades: reservas de espaços + OS com prestadores
 
-Aplicação web com três níveis de acesso que centraliza a operação:
-- Admin controla tudo
-- Recepcionista opera o dia a dia
-- Membro faz e acompanha suas próprias reservas
+**Escritórios BTS (Built-to-Suit) administrados:**
+- Prudential Campina Grande
+- Prudential Dourados
+- Prudential Ipatinga
+- Stefanini Campina Grande
+- Funcionalidades: apenas OS com prestadores e SLA
+
+## Unidades do sistema
+
+| Nome | Tipo | Módulos ativos |
+|---|---|---|
+| Coworking | COWORKING | Reservas + OS |
+| Prudential Campina Grande | BTS | Só OS |
+| Prudential Dourados | BTS | Só OS |
+| Prudential Ipatinga | BTS | Só OS |
+| Stefanini Campina Grande | BTS | Só OS |
 
 ## Perfis de usuário
 
 | Perfil | Acesso |
 |---|---|
-| ADMIN | Tudo — espaços, reservas, equipe, manutenção, configurações |
-| RECEPTIONIST | Reservas (todas), tickets (todos), visualizar equipe |
-| MEMBER | Próprias reservas, abrir tickets, ver disponibilidade |
+| ADMIN | Todas as unidades — reservas, OS, prestadores, relatórios |
+| RECEPTIONIST | Só sua unidade — cria OS, atualiza status, cadastra prestadores |
+| MEMBER | Só coworking — faz reservas, acompanha suas reservas |
 
-## Espaços físicos
+## Espaços físicos (só coworking)
 
 Tipos:
-- MEETING_ROOM — sala de reunião (com capacidade e recursos)
-- WORKSTATION — estação de trabalho fixa
-- COMMON_AREA — área comum reservável
+- MEETING_ROOM — sala de reunião (3 unidades)
+- PRIVATE_OFFICE — sala privativa (22 unidades)
+- WORKSTATION — estação de trabalho (40 unidades)
 
-Campos: nome, tipo, capacidade, descrição, status, createdAt.
+Campos: nome, tipo, capacidade, descrição, status, unidade.
 
-Status possíveis:
+Status:
 - ACTIVE — disponível para reservas
-- MAINTENANCE — bloqueado, não aceita reservas
+- MAINTENANCE — bloqueado
 - INACTIVE — desativado
 
-## Reservas
+## Reservas (só coworking)
 
-Regras de negócio:
-- Validação de conflito obrigatória e atômica (mesma transação)
-- Espaço em MAINTENANCE não aceita nova reserva
-- Cancelamento permitido até 2 horas antes
+Regras:
+- Validação de conflito obrigatória e atômica
+- Espaço em MAINTENANCE não aceita reserva
+- Cancelamento permitido até 2h antes
 - Duração mínima: 30 minutos
-- Horário de funcionamento: 7h–22h
+- Horário: 7h–22h
 
-Status possíveis:
-- CONFIRMED — reserva ativa
-- CANCELLED — cancelada pelo membro ou admin
+Status: CONFIRMED, CANCELLED
 
-Fluxo do membro:
-1. Visualiza disponibilidade por espaço
-2. Seleciona espaço, data, hora início e fim
-3. Sistema valida conflito automaticamente
-4. Confirma reserva
+## Ordens de Serviço — OS (todas as unidades)
 
-## Tickets de manutenção
+Fluxo de aprovação:
+```
+DRAFT → PENDING_APPROVAL → APPROVED → IN_PROGRESS → DONE
+                        ↓
+                     REJECTED
+```
 
-Fluxo: OPEN → IN_PROGRESS → DONE / CANCELLED
+Quem faz o quê:
+- RECEPTIONIST → cria OS (DRAFT), envia para aprovação
+- ADMIN → aprova (APPROVED) ou rejeita (REJECTED)
+- RECEPTIONIST → atualiza para IN_PROGRESS quando prestador inicia
+- ADMIN → fecha como DONE
 
-Prioridades:
-- LOW — sem urgência
-- MEDIUM — padrão
-- HIGH — bloqueia espaço automaticamente
-- URGENT — bloqueia espaço automaticamente
+Campos:
+- Número sequencial por unidade (OS-2026-0001)
+- Unidade vinculada
+- Espaço afetado (opcional — para OS do coworking)
+- Tipo de serviço: CLEANING, ELECTRICAL, HYDRAULIC, OTHER
+- Descrição
+- Prestador vinculado
+- Prioridade: LOW, MEDIUM, HIGH, URGENT
+- Status
+- Aprovado por (User) + data de aprovação
+- createdAt, updatedAt
 
-Regras críticas:
-- Ticket HIGH ou URGENT: muda Space.status para MAINTENANCE na mesma transação
-- Ticket fechado (DONE): volta Space.status para ACTIVE na mesma transação
+## SLA por prioridade
 
-Campos: espaço afetado, título, descrição, prioridade, status, reporter, createdAt, updatedAt.
+| Prioridade | Prazo de aprovação | Prazo de execução |
+|---|---|---|
+| URGENT | 2 horas | 24 horas |
+| HIGH | 4 horas | 48 horas |
+| MEDIUM | 24 horas | 5 dias |
+| LOW | 48 horas | 15 dias |
 
-## Dashboard operacional
+OS com SLA vencido aparece destacada no painel do Admin.
 
-Para Admin:
-- Ocupação do dia (espaços reservados agora)
-- Tickets abertos por prioridade
-- Reservas da semana por espaço
-- Taxa de ocupação dos últimos 30 dias
+## Prestadores (todas as unidades)
 
-Para Membro:
+Tipos:
+- RECURRING — prestador fixo da unidade
+- PUNCTUAL — prestador avulso por OS
+
+Campos: nome, especialidade, telefone, email,
+tipo, unidade vinculada, status (ACTIVE/INACTIVE), createdAt.
+
+Especialidades: CLEANING, ELECTRICAL, HYDRAULIC, OTHER
+
+## Dashboard
+
+**Admin (visão geral ou por unidade):**
+- Filtro: Hoje / Esta semana / Este mês / 30 dias
+- Cards: OS abertas, OS em progresso, SLA crítico, OS concluídas
+- Gráfico: volume por dia
+- Lista: OS com SLA vencido em destaque
+
+**Receptionist (só sua unidade):**
+- OS da sua unidade por status
+- Prestadores ativos da unidade
+- Botão rápido: Nova OS
+
+**Member (só coworking):**
 - Minhas reservas futuras
-- Histórico de reservas passadas
-- Botão rápido nova reserva
+- Histórico de reservas
+- Botão rápido: Nova reserva
 
 ## O que este sistema NÃO faz
 
-- Pagamentos, faturamento ou controle financeiro
-- Controle de acesso físico (catracas, fechaduras)
-- CRM ou gestão de contratos
+- Pagamentos, faturamento ou financeiro de qualquer tipo
+- Controle de acesso físico
+- CRM ou contratos
 - App mobile nativo
-- Gestão de mensalidades ou planos
-
-## Stack
-
-- Next.js 14 App Router + TypeScript
-- Tailwind CSS + shadcn/ui
-- Prisma ORM + PostgreSQL (Supabase)
-- NextAuth.js v5
-- Zod para validação
-- Vitest + Testing Library para testes
+- Gestão de mensalidades
