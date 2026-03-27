@@ -281,3 +281,10 @@ Se surgir incompatibilidade, investigar e documentar aqui.
 NextAuth v5 usa AUTH_SECRET no .env (não NEXTAUTH_SECRET).
 Gerar com: openssl rand -base64 32
 Adicionar no .env antes de testar login.
+
+**Next.js 16.2.1 — proxy.ts em vez de middleware.ts:**
+Next.js 16 deprecou a convenção middleware.ts em favor de proxy.ts.
+O arquivo de proteção de rotas é src/proxy.ts (não src/middleware.ts).
+Se encontrar referências antigas a middleware.ts, renomear para proxy.ts.
+O runtime do proxy deve ser forçado para Node.js: export const runtime = "nodejs"
+(NextAuth com Prisma/bcrypt não roda no Edge Runtime).

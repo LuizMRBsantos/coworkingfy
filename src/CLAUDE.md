@@ -43,4 +43,4 @@
 - /dashboard/admin/*      → só ADMIN
 - /dashboard/reception/*  → ADMIN + RECEPTIONIST  
 - /dashboard/member/*     → todos os roles autenticados
-- Redirecionamento por role feito no middleware
+- Redirecionamento por role feito no middlewaregit
