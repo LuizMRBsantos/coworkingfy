@@ -19,16 +19,21 @@ enum Role {
   MEMBER
 }
 
+enum UnitType {
+  COWORKING
+  BTS
+}
+
 enum SpaceType {
   MEETING_ROOM
+  PRIVATE_OFFICE
   WORKSTATION
-  COMMON_AREA
 }
 
 enum SpaceStatus {
   ACTIVE
-  INACTIVE
   MAINTENANCE
+  INACTIVE
 }
 
 enum BookingStatus {
@@ -36,23 +41,57 @@ enum BookingStatus {
   CANCELLED
 }
 
-enum TicketPriority {
+enum ServiceOrderStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  IN_PROGRESS
+  DONE
+  REJECTED
+  CANCELLED
+}
+
+enum ServiceType {
+  CLEANING
+  ELECTRICAL
+  HYDRAULIC
+  OTHER
+}
+
+enum Priority {
   LOW
   MEDIUM
   HIGH
   URGENT
 }
 
-enum TicketStatus {
-  OPEN
-  IN_PROGRESS
-  DONE
-  CANCELLED
+enum ProviderType {
+  RECURRING
+  PUNCTUAL
+}
+
+enum ProviderStatus {
+  ACTIVE
+  INACTIVE
 }
 
 // ---------------------------------------------------------------------------
 // Models
 // ---------------------------------------------------------------------------
+
+model Unit {
+  id        String   @id @default(cuid())
+  name      String
+  type      UnitType
+  createdAt DateTime @default(now())
+
+  users          User[]
+  spaces         Space[]
+  serviceOrders  ServiceOrder[]
+  providers      Provider[]
+
+  @@map("units")
+}
 
 model User {
   id            String    @id @default(cuid())
@@ -62,22 +101,27 @@ model User {
   image         String?
   password      String?
   role          Role      @default(MEMBER)
+  // ADMIN não precisa de unidade fixa — unitId é opcional
+  unitId        String?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  bookings         Booking[]
-  ticketsReported  Ticket[]  @relation("TicketReportedBy")
-  ticketsAssigned  Ticket[]  @relation("TicketAssignedTo")
+  unit                   Unit?          @relation(fields: [unitId], references: [id])
+  bookings               Booking[]
+  serviceOrdersCreated   ServiceOrder[] @relation("ServiceOrderCreatedBy")
+  serviceOrdersApproved  ServiceOrder[] @relation("ServiceOrderApprovedBy")
 
   // NextAuth v5
   accounts Account[]
   sessions Session[]
 
+  @@index([unitId])
   @@map("users")
 }
 
 model Space {
   id          String      @id @default(cuid())
+  unitId      String
   name        String
   description String?
   capacity    Int
@@ -86,9 +130,11 @@ model Space {
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 
-  bookings Booking[]
-  tickets  Ticket[]
+  unit          Unit           @relation(fields: [unitId], references: [id])
+  bookings      Booking[]
+  serviceOrders ServiceOrder[]
 
+  @@index([unitId])
   @@map("spaces")
 }
 
@@ -111,25 +157,51 @@ model Booking {
   @@map("bookings")
 }
 
-model Ticket {
-  id           String         @id @default(cuid())
-  spaceId      String
-  reportedById String
-  assignedToId String?
-  title        String
+model ServiceOrder {
+  id           String             @id @default(cuid())
+  number       String             @unique // gerado na camada de aplicação: OS-2026-0001
+  unitId       String
+  spaceId      String?            // opcional — OS do coworking pode ter espaço afetado
+  createdById  String
+  providerId   String?            // opcional — pode ser definido após aprovação
+  approvedById String?
+  serviceType  ServiceType
   description  String
-  priority     TicketPriority
-  status       TicketStatus   @default(OPEN)
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
+  priority     Priority
+  status       ServiceOrderStatus @default(DRAFT)
+  approvedAt   DateTime?
+  slaDeadline  DateTime?          // calculado na camada de aplicação quando status → APPROVED
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
 
-  space      Space @relation(fields: [spaceId], references: [id])
-  reportedBy User  @relation("TicketReportedBy", fields: [reportedById], references: [id])
-  assignedTo User? @relation("TicketAssignedTo", fields: [assignedToId], references: [id])
+  unit        Unit      @relation(fields: [unitId], references: [id])
+  space       Space?    @relation(fields: [spaceId], references: [id])
+  createdBy   User      @relation("ServiceOrderCreatedBy", fields: [createdById], references: [id])
+  provider    Provider? @relation(fields: [providerId], references: [id])
+  approvedBy  User?     @relation("ServiceOrderApprovedBy", fields: [approvedById], references: [id])
 
-  @@index([spaceId])
-  @@index([reportedById])
-  @@map("tickets")
+  @@index([unitId])
+  @@index([createdById])
+  @@index([status])
+  @@map("service_orders")
+}
+
+model Provider {
+  id          String         @id @default(cuid())
+  unitId      String
+  name        String
+  specialty   ServiceType
+  phone       String?
+  email       String?
+  type        ProviderType
+  status      ProviderStatus @default(ACTIVE)
+  createdAt   DateTime       @default(now())
+
+  unit          Unit           @relation(fields: [unitId], references: [id])
+  serviceOrders ServiceOrder[]
+
+  @@index([unitId])
+  @@map("providers")
 }
 
 // ---------------------------------------------------------------------------
