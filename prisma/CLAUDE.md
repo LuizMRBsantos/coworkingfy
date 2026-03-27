@@ -31,3 +31,18 @@
 - Modelos financeiros: Invoice, Payment, Subscription, Plan
 - Campos de cartão de crédito ou dados bancários
 - Ticket — foi substituído por ServiceOrder
+
+## Prisma 7 — adapter obrigatório
+
+Prisma 7 requer `@prisma/adapter-pg` para conectar ao PostgreSQL.
+Instalar: `npm install @prisma/adapter-pg pg`
+Tipos: `npm install -D @types/pg`
+
+Isso é necessário no `src/lib/db.ts` quando for criado.
+Sem o adapter, o PrismaClient não consegue conectar.
+
+## Seed
+
+Prisma 7 lê a configuração do seed em `prisma.config.ts`, não no `package.json`.
+Usar `tsx` em vez de `ts-node` para executar o seed.
+Rodar com: `npx prisma db seed`

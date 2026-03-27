@@ -205,3 +205,38 @@ Coworking: reservas + OS. BTS: só OS e SLA.
 Admin vê todas as unidades. Receptionist vê só a sua.
 Unidades reais: Coworking, Prudential CG, Prudential Dourados,
 Prudential Ipatinga, Stefanini CG
+
+# Código fonte — regras
+
+## Componentes Next.js
+- Server Components por padrão — nunca adicionar 'use client' sem motivo
+- Client Components só quando necessário: eventos DOM, useState, useEffect
+- Motivo obrigatório em comentário quando usar 'use client'
+
+## Imports
+- Sempre usar alias @/ — nunca caminhos relativos ../../
+- Ordem: externos → internos → tipos
+
+## TypeScript
+- Nunca usar `any` — sempre tipar explicitamente
+- Preferir `interface` para objetos, `type` para unions
+
+## Formulários
+- react-hook-form + Zod para todos os formulários
+- Validação no cliente E no servidor (API Route)
+
+## Estilização
+- Tailwind CSS para layout e spacing
+- shadcn/ui para componentes de interface
+- Nunca CSS inline — sempre classes Tailwind
+
+## Prisma no código
+- Sempre usar o singleton do src/lib/db.ts
+- Nunca instanciar PrismaClient diretamente nos componentes
+- Prisma 7 requer @prisma/adapter-pg — já configurado no db.ts
+
+## API Routes
+- Verificar sessão primeiro → 401 se ausente
+- Verificar role segundo → 403 se insuficiente
+- Validar body com Zod antes de tocar no banco
+- Shape de erro consistente: { error: string, code?: string }
