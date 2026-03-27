@@ -5,25 +5,29 @@
 - Sempre incluir `createdAt DateTime @default(now())`
 - Modelos que atualizam frequentemente incluem `updatedAt DateTime @updatedAt`
 - Enums em inglês, UPPER_SNAKE_CASE
+- Prisma 7 — URL do banco fica em prisma.config.ts, não no schema.prisma
+- datasource só tem `provider = "postgresql"`, sem url
 
 ## Migrations
-- Nomes descritivos: `init_schema`, `add_booking_status`
+- Nomes descritivos: `init_schema`, `add_service_orders`
 - Nunca editar migration já aplicada — criar nova
 - Sempre rodar `npx prisma generate` após mudar o schema
 
+## Arquitetura multi-unidade
+- Tudo se conecta via unitId (exceto User.unitId que é opcional)
+- Admin não precisa de unidade fixa — vê tudo
+- Receptionist tem unitId obrigatório — vê só sua unidade
+- Space só existe no coworking (UnitType.COWORKING)
+- Booking só existe vinculado a Space (só coworking)
+- ServiceOrder existe em todas as unidades
+
 ## Regras críticas de negócio
 - Booking: validação de conflito usa transação atômica
-- Ticket HIGH/URGENT: muda Space.status para MAINTENANCE na mesma transação
-- Ticket DONE: volta Space.status para ACTIVE na mesma transação
+- ServiceOrder HIGH/URGENT com SLA — prazo rastreado por approvedAt
+- ServiceOrder precisa de approvedById + approvedAt para rastrear aprovação
+- Índice composto em Booking: [spaceId, startTime, endTime]
 
 ## O que nunca criar
 - Modelos financeiros: Invoice, Payment, Subscription, Plan
 - Campos de cartão de crédito ou dados bancários
-
-### [Dia 2] Arquitetura multi-unidade
-Sistema gerencia 5 unidades: 1 coworking + 4 BTS.
-Modelo Unit adicionado ao schema — tudo se conecta via unitId.
-Coworking: reservas + OS. BTS: só OS e SLA.
-Admin vê todas as unidades. Receptionist vê só a sua.
-Unidades reais: Coworking, Prudential CG, Prudential Dourados,
-Prudential Ipatinga, Stefanini CG
+- Ticket — foi substituído por ServiceOrder
