@@ -240,3 +240,44 @@ Prudential Ipatinga, Stefanini CG
 - Verificar role segundo → 403 se insuficiente
 - Validar body com Zod antes de tocar no banco
 - Shape de erro consistente: { error: string, code?: string }
+
+### [Fase 2] Autenticação implementada
+Arquivos criados:
+- src/lib/db.ts — singleton PrismaClient com PrismaPg adapter
+- src/lib/auth.ts — NextAuth v5 Credentials + JWT com role e unitId
+- src/app/api/auth/[...nextauth]/route.ts — handlers GET e POST
+- src/app/page.tsx — redireciona / para /login ou /dashboard
+- src/app/(auth)/login/page.tsx — formulário com react-hook-form + Zod
+- src/app/(dashboard)/dashboard/page.tsx — página mínima com sessão
+
+Dependências instaladas:
+- shadcn/ui (Tailwind v4 detectado automaticamente)
+- react-hook-form + @hookform/resolvers
+- Componentes: button, card, input, label
+
+Status: dev server rodando sem erros, redirect 307 funcionando.
+Próximo passo: testar login no browser e implementar middleware de proteção.
+
+### [Fase 2] Decisões técnicas importantes
+
+**Prisma 7 runtime:**
+PrismaClient não aceita url no schema nem datasourceUrl no construtor.
+Conexão feita via @prisma/adapter-pg explícito em src/lib/db.ts.
+Vale para seed, db.ts e qualquer ponto que instancie o client.
+
+**prisma.config.ts é só para CLI:**
+URL de conexão só para migrate, seed e studio.
+Runtime lê via adapter — nunca via prisma.config.ts.
+
+**NextAuth v5 — onde usar cada função:**
+- Server Components → auth() de @/lib/auth
+- Client Components → signIn/signOut de next-auth/react
+
+**Zod 4 instalado (4.3.6):**
+Stack documenta Zod 3 mas API básica é compatível.
+Se surgir incompatibilidade, investigar e documentar aqui.
+
+**AUTH_SECRET:**
+NextAuth v5 usa AUTH_SECRET no .env (não NEXTAUTH_SECRET).
+Gerar com: openssl rand -base64 32
+Adicionar no .env antes de testar login.
