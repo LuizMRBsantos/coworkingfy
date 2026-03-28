@@ -37,9 +37,9 @@ export function ServiceOrderFilters({
   const router = useRouter();
   const pathname = usePathname();
 
-  function updateFilter(key: "status" | "unitId", value: string) {
+  function updateFilter(key: "status" | "unitId", value: string | null) {
     const params = new URLSearchParams(window.location.search);
-    if (value === "ALL") {
+    if (!value || value === "ALL") {
       params.delete(key);
     } else {
       params.set(key, value);
@@ -47,13 +47,16 @@ export function ServiceOrderFilters({
     router.push(`${pathname}?${params.toString()}`);
   }
 
+  const statusValue: string = currentStatus ?? "ALL";
+  const unitValue: string = currentUnitId ?? "ALL";
+
   return (
     <div className="flex flex-wrap gap-3">
-      <Select value={currentStatus ?? "ALL"} onValueChange={(v) => updateFilter("status", v)}>
+      <Select value={statusValue} onValueChange={(v) => updateFilter("status", v)}>
         <SelectTrigger className="w-52">
           <SelectValue placeholder="Todos os status" />
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent className="max-h-60 overflow-y-auto" alignItemWithTrigger={false}>
           {STATUS_OPTIONS.map((opt) => (
             <SelectItem key={opt.value} value={opt.value}>
               {opt.label}
@@ -63,11 +66,11 @@ export function ServiceOrderFilters({
       </Select>
 
       {showUnitFilter && (
-        <Select value={currentUnitId ?? "ALL"} onValueChange={(v) => updateFilter("unitId", v)}>
+        <Select value={unitValue} onValueChange={(v) => updateFilter("unitId", v)}>
           <SelectTrigger className="w-52">
             <SelectValue placeholder="Todas as unidades" />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className="max-h-60 overflow-y-auto" alignItemWithTrigger={false}>
             <SelectItem value="ALL">Todas as unidades</SelectItem>
             {units.map((unit) => (
               <SelectItem key={unit.id} value={unit.id}>
