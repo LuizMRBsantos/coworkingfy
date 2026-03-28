@@ -288,3 +288,25 @@ O arquivo de proteção de rotas é src/proxy.ts (não src/middleware.ts).
 Se encontrar referências antigas a middleware.ts, renomear para proxy.ts.
 O runtime do proxy deve ser forçado para Node.js: export const runtime = "nodejs"
 (NextAuth com Prisma/bcrypt não roda no Edge Runtime).
+
+### [Fase 3] API de Service Orders completa
+Arquivos criados:
+- src/lib/validations/service-order.ts — schemas Zod
+- src/app/api/service-orders/route.ts — GET + POST
+- src/app/api/service-orders/[id]/route.ts — GET + PUT
+- src/tests/api/service-orders.test.ts — 14 testes
+
+Decisões técnicas:
+- Número sequencial OS-{ANO}-{NNNN} gerado em transação com retry (3x)
+- Máquina de estados em TRANSITIONS com from + allowedRoles
+- SLA calculado em horas: URGENT=24h, HIGH=48h, MEDIUM=120h, LOW=360h
+- Filtro por unidade: ADMIN vê tudo, RECEPTIONIST vê só sua unidade
+
+Fix CI:
+- Adicionado step "npx prisma generate" no ci.yml
+- Sem esse step o CI falha com "Cannot find module .prisma/client/default"
+
+Status atual:
+- API de OS testada e funcionando localmente
+- CI corrigido — aguardando confirmação do GitHub Actions
+- Próximo passo: UI das Ordens de Serviço
