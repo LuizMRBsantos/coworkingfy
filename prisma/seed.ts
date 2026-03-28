@@ -1,4 +1,4 @@
-import { PrismaClient, UnitType, SpaceType, SpaceStatus, Role, ProviderType, ProviderStatus } from "@prisma/client";
+import { PrismaClient, UnitType, SpaceType, SpaceStatus, Role, ProviderType, ProviderStatus, ServiceOrderStatus, ServiceType, Priority } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import bcrypt from "bcryptjs";
 import "dotenv/config";
@@ -188,6 +188,108 @@ async function main() {
       },
     });
     console.log(`   - ${provider.name} (${provider.specialty}, ${provider.type})`);
+  }
+  console.log();
+
+  // ---------------------------------------------------------------------------
+  // 5. Ordens de Serviço de exemplo
+  // ---------------------------------------------------------------------------
+
+  const now = new Date();
+  const slaDeadline = new Date(now.getTime() + 24 * 60 * 60 * 1000); // URGENT = 24h
+
+  const serviceOrders: {
+    id: string;
+    number: string;
+    unitId: string;
+    createdById: string;
+    serviceType: ServiceType;
+    description: string;
+    priority: Priority;
+    status: ServiceOrderStatus;
+    approvedById?: string;
+    approvedAt?: Date;
+    slaDeadline?: Date;
+    providerId?: string;
+  }[] = [
+    {
+      id: "os-draft-001",
+      number: "OS-2026-0001",
+      unitId: coworking.id,
+      createdById: "user-recepcao",
+      serviceType: ServiceType.CLEANING,
+      description: "Limpeza geral da área de trabalho compartilhada após evento",
+      priority: Priority.MEDIUM,
+      status: ServiceOrderStatus.DRAFT,
+    },
+    {
+      id: "os-pending-001",
+      number: "OS-2026-0002",
+      unitId: prudentialCG.id,
+      createdById: "user-ops-prudential",
+      serviceType: ServiceType.ELECTRICAL,
+      description: "Tomadas do corredor principal com falha intermitente, precisa de vistoria urgente",
+      priority: Priority.HIGH,
+      status: ServiceOrderStatus.PENDING_APPROVAL,
+    },
+    {
+      id: "os-approved-001",
+      number: "OS-2026-0003",
+      unitId: stefaniniCG.id,
+      createdById: "user-admin",
+      serviceType: ServiceType.HYDRAULIC,
+      description: "Vazamento identificado no banheiro do 2º andar — risco de dano estrutural",
+      priority: Priority.URGENT,
+      status: ServiceOrderStatus.APPROVED,
+      approvedById: "user-admin",
+      approvedAt: now,
+      slaDeadline,
+    },
+    {
+      id: "os-inprogress-001",
+      number: "OS-2026-0004",
+      unitId: prudentialDourados.id,
+      createdById: "user-admin",
+      serviceType: ServiceType.CLEANING,
+      description: "Limpeza periódica das áreas comuns conforme contrato mensal",
+      priority: Priority.LOW,
+      status: ServiceOrderStatus.IN_PROGRESS,
+      providerId: "provider-limpeza",
+    },
+    {
+      id: "os-done-001",
+      number: "OS-2026-0005",
+      unitId: prudentialIpatinga.id,
+      createdById: "user-admin",
+      serviceType: ServiceType.ELECTRICAL,
+      description: "Substituição das luminárias da sala de reunião principal",
+      priority: Priority.MEDIUM,
+      status: ServiceOrderStatus.DONE,
+      providerId: "provider-eletrica",
+    },
+  ];
+
+  console.log("✅ Ordens de Serviço criadas:");
+  for (const os of serviceOrders) {
+    await prisma.serviceOrder.upsert({
+      where: { id: os.id },
+      update: {},
+      create: {
+        id: os.id,
+        number: os.number,
+        unitId: os.unitId,
+        createdById: os.createdById,
+        serviceType: os.serviceType,
+        description: os.description,
+        priority: os.priority,
+        status: os.status,
+        ...(os.approvedById ? { approvedById: os.approvedById } : {}),
+        ...(os.approvedAt ? { approvedAt: os.approvedAt } : {}),
+        ...(os.slaDeadline ? { slaDeadline: os.slaDeadline } : {}),
+        ...(os.providerId ? { providerId: os.providerId } : {}),
+      },
+    });
+    console.log(`   - ${os.number} | ${os.status} | ${os.priority} | ${os.unitId}`);
   }
   console.log();
 
