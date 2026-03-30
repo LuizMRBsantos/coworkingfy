@@ -24,13 +24,13 @@ import { PUT } from "@/app/api/service-orders/[id]/route";
 // ── Sessões ──────────────────────────────────────────────────────────────────
 
 const adminSession = {
-  user: { id: "admin-id", role: "ADMIN" as const, unitId: null, name: "Admin", email: "admin@test.com" },
+  user: { id: "admin-id", role: "ADMIN" as const, unitIds: [], name: "Admin", email: "admin@test.com" },
 };
 const receptionistSession = {
-  user: { id: "recep-id", role: "RECEPTIONIST" as const, unitId: "unit-1", name: "Recep", email: "recep@test.com" },
+  user: { id: "recep-id", role: "RECEPTIONIST" as const, unitIds: ["unit-1"], name: "Recep", email: "recep@test.com" },
 };
 const memberSession = {
-  user: { id: "member-id", role: "MEMBER" as const, unitId: "unit-1", name: "Member", email: "member@test.com" },
+  user: { id: "member-id", role: "MEMBER" as const, unitIds: ["unit-1"], name: "Member", email: "member@test.com" },
 };
 
 // ── Dados de teste ────────────────────────────────────────────────────────────
@@ -104,7 +104,7 @@ describe("GET /api/service-orders", () => {
     expect(res.status).toBe(200);
 
     expect(db.serviceOrder.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: expect.objectContaining({ unitId: "unit-1" }) })
+      expect.objectContaining({ where: expect.objectContaining({ unitId: { in: ["unit-1"] } }) })
     );
   });
 

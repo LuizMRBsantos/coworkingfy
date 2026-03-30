@@ -42,7 +42,7 @@ export default async function TicketDetailPage({ params }: PageProps) {
   const session = await auth();
   if (!session) redirect("/login");
 
-  const { role, unitId: sessionUnitId } = session.user;
+  const { role, unitIds } = session.user;
   if (role === "MEMBER") redirect("/dashboard");
 
   const { id } = await params;
@@ -65,8 +65,8 @@ export default async function TicketDetailPage({ params }: PageProps) {
 
   if (!ticket) notFound();
 
-  // RECEPTIONIST só vê tickets da sua unidade
-  if (role === "RECEPTIONIST" && ticket.unitId !== sessionUnitId) {
+  // RECEPTIONIST só vê tickets das suas unidades
+  if (role === "RECEPTIONIST" && !unitIds.includes(ticket.unitId)) {
     redirect("/dashboard/admin/tickets");
   }
 

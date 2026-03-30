@@ -6,7 +6,7 @@ import type { Role } from "@prisma/client";
 import { db } from "./db";
 
 // ---------------------------------------------------------------------------
-// Augmentação de tipos — expõe role e unitId no objeto session.user
+// Augmentação de tipos — expõe role e unitIds no objeto session.user
 // ---------------------------------------------------------------------------
 
 declare module "next-auth" {
@@ -14,13 +14,13 @@ declare module "next-auth" {
     user: {
       id: string;
       role: Role;
-      unitId: string | null;
+      unitIds: string[];
     } & DefaultSession["user"];
   }
 
   interface User {
     role: Role;
-    unitId: string | null;
+    unitIds: string[];
   }
 }
 
@@ -28,7 +28,7 @@ declare module "next-auth/jwt" {
   interface JWT {
     id: string;
     role: Role;
-    unitId: string | null;
+    unitIds: string[];
   }
 }
 
@@ -68,7 +68,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             name: true,
             password: true,
             role: true,
-            unitId: true,
+            userUnits: { select: { unitId: true } },
           },
         });
 
@@ -82,7 +82,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           email: user.email,
           name: user.name,
           role: user.role,
-          unitId: user.unitId,
+          unitIds: user.userUnits.map((u) => u.unitId),
         };
       },
     }),
@@ -94,7 +94,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (user) {
         token.id = user.id!;
         token.role = user.role;
-        token.unitId = user.unitId;
+        token.unitIds = user.unitIds;
       }
       return token;
     },
@@ -102,7 +102,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     session({ session, token }) {
       session.user.id = token.id;
       session.user.role = token.role;
-      session.user.unitId = token.unitId;
+      session.user.unitIds = token.unitIds;
       return session;
     },
   },

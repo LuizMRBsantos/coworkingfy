@@ -91,7 +91,7 @@ model Unit {
   type      UnitType
   createdAt DateTime @default(now())
 
-  users         User[]
+  userUnits     UserUnit[]
   spaces        Space[]
   tickets       Ticket[]
   serviceOrders ServiceOrder[]
@@ -108,12 +108,10 @@ model User {
   image         String?
   password      String?
   role          Role      @default(MEMBER)
-  // ADMIN não precisa de unidade fixa — unitId é opcional
-  unitId        String?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  unit                  Unit?          @relation(fields: [unitId], references: [id])
+  userUnits             UserUnit[]
   bookings              Booking[]
   ticketsCreated        Ticket[]       @relation("TicketCreatedBy")
   serviceOrdersCreated  ServiceOrder[] @relation("ServiceOrderCreatedBy")
@@ -123,8 +121,21 @@ model User {
   accounts Account[]
   sessions Session[]
 
-  @@index([unitId])
   @@map("users")
+}
+
+model UserUnit {
+  id     String @id @default(cuid())
+  userId String
+  unitId String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  unit Unit @relation(fields: [unitId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, unitId])
+  @@index([userId])
+  @@index([unitId])
+  @@map("user_units")
 }
 
 model Space {

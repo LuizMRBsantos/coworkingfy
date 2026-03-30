@@ -334,3 +334,17 @@ API corrigida:
 - Validations atualizadas para Zod v4
 
 Próximo passo: UI de Tickets e formulário de OS vinculada ao Ticket
+
+### [Refatoração] User → múltiplas unidades
+Motivo: RECEPTIONIST pode ser responsável por mais de uma unidade.
+
+ANTES: User.unitId String? (1 unidade por usuário)
+DEPOIS: tabela pivot UserUnit (N unidades por usuário)
+
+Impacto:
+- Schema: nova tabela UserUnit, remover unitId do User
+- Seed: atualizar para usar UserUnit
+- proxy.ts: verificar array de unidades
+- API routes: filtrar por unidades do usuário
+- NextAuth: session.user.unitIds string[] em vez de unitId string
+- Header: seletor mostra unidades do usuário (RECEPTIONIST)

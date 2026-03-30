@@ -16,19 +16,18 @@ export async function GET(req: NextRequest) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
 
-  const { role, unitId: sessionUnitId } = session.user;
+  const { role, unitIds } = session.user;
   if (role === "MEMBER") return NextResponse.json({ error: "Sem permissão" }, { status: 403 });
 
-  const unitFilter =
-    role === "ADMIN"
-      ? req.nextUrl.searchParams.get("unitId") ?? undefined
-      : sessionUnitId ?? undefined;
+  const unitFilter = role === "ADMIN"
+    ? req.nextUrl.searchParams.get("unitId") ?? undefined
+    : undefined;
 
   const statusParam = req.nextUrl.searchParams.get("status") as TicketStatus | null;
 
   const tickets = await db.ticket.findMany({
     where: {
-      ...(unitFilter ? { unitId: unitFilter } : {}),
+      ...(unitFilter ? { unitId: unitFilter } : role === "RECEPTIONIST" ? { unitId: { in: unitIds } } : {}),
       ...(statusParam ? { status: statusParam } : {}),
     },
     orderBy: { createdAt: "desc" },

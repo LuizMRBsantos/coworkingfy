@@ -15,14 +15,14 @@ export default async function ServiceOrdersPage({ searchParams }: PageProps) {
 
   const { status, unitId } = await searchParams;
 
-  const role = session.user.role;
-  // RECEPTIONIST sempre usa sua própria unidade — ignora o ?unitId= da URL
-  const unitFilter = role === "ADMIN" ? unitId : (session.user.unitId ?? undefined);
+  const { role, unitIds } = session.user;
+  // RECEPTIONIST vê só suas unidades — ignora o ?unitId= da URL
+  const unitFilter = role === "ADMIN" ? unitId : undefined;
 
   const [serviceOrders, units] = await Promise.all([
     db.serviceOrder.findMany({
       where: {
-        ...(unitFilter ? { unitId: unitFilter } : {}),
+        ...(unitFilter ? { unitId: unitFilter } : role === "RECEPTIONIST" ? { unitId: { in: unitIds } } : {}),
         ...(status ? { status: status as ServiceOrderStatus } : {}),
       },
       orderBy: { createdAt: "desc" },
@@ -45,7 +45,7 @@ export default async function ServiceOrdersPage({ searchParams }: PageProps) {
       <ServiceOrderFilters
         units={units}
         currentStatus={status}
-        currentUnitId={unitFilter}
+        currentUnitId={role === "ADMIN" ? unitFilter : unitIds[0]}
         showUnitFilter={role === "ADMIN"}
       />
 

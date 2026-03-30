@@ -13,16 +13,16 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Sem permissão" }, { status: 403 });
   }
 
-  const unitFilter =
-    session.user.role === "ADMIN"
-      ? req.nextUrl.searchParams.get("unitId") ?? undefined
-      : session.user.unitId ?? undefined;
+  const { role, unitIds } = session.user;
+  const unitFilter = role === "ADMIN"
+    ? req.nextUrl.searchParams.get("unitId") ?? undefined
+    : undefined;
 
   const statusParam = req.nextUrl.searchParams.get("status") as ServiceOrderStatus | null;
 
   const serviceOrders = await db.serviceOrder.findMany({
     where: {
-      ...(unitFilter ? { unitId: unitFilter } : {}),
+      ...(unitFilter ? { unitId: unitFilter } : role === "RECEPTIONIST" ? { unitId: { in: unitIds } } : {}),
       ...(statusParam ? { status: statusParam } : {}),
     },
     orderBy: { createdAt: "desc" },
@@ -40,7 +40,7 @@ export async function POST(req: Request) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
 
-  const { role, unitId, id: userId } = session.user;
+  const { role, unitIds: userUnitIds, id: userId } = session.user;
 
   if (role === "MEMBER") return NextResponse.json({ error: "Sem permissão" }, { status: 403 });
 
@@ -52,7 +52,7 @@ export async function POST(req: Request) {
 
   const data = parsed.data;
 
-  if (role === "RECEPTIONIST" && data.unitId !== unitId) {
+  if (role === "RECEPTIONIST" && !userUnitIds.includes(data.unitId)) {
     return NextResponse.json({ error: "Sem permissão para esta unidade" }, { status: 403 });
   }
 

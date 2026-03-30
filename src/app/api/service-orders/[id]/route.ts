@@ -38,7 +38,7 @@ export async function GET(
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
 
-  const { role, unitId } = session.user;
+  const { role, unitIds } = session.user;
   if (role === "MEMBER") return NextResponse.json({ error: "Sem permissão" }, { status: 403 });
 
   const { id } = await params;
@@ -56,7 +56,7 @@ export async function GET(
 
   if (!serviceOrder) return NextResponse.json({ error: "OS não encontrada" }, { status: 404 });
 
-  if (role === "RECEPTIONIST" && serviceOrder.unitId !== unitId) {
+  if (role === "RECEPTIONIST" && !unitIds.includes(serviceOrder.unitId)) {
     return NextResponse.json({ error: "Sem permissão" }, { status: 403 });
   }
 
@@ -70,7 +70,7 @@ export async function PUT(
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
 
-  const { role, unitId, id: userId } = session.user;
+  const { role, unitIds, id: userId } = session.user;
   if (role === "MEMBER") return NextResponse.json({ error: "Sem permissão" }, { status: 403 });
 
   const body = await req.json();
@@ -88,7 +88,7 @@ export async function PUT(
   });
   if (!serviceOrder) return NextResponse.json({ error: "OS não encontrada" }, { status: 404 });
 
-  if (role === "RECEPTIONIST" && serviceOrder.unitId !== unitId) {
+  if (role === "RECEPTIONIST" && !unitIds.includes(serviceOrder.unitId)) {
     return NextResponse.json({ error: "Sem permissão" }, { status: 403 });
   }
 

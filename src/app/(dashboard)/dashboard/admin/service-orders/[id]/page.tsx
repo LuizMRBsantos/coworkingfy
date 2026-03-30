@@ -50,7 +50,7 @@ export default async function ServiceOrderDetailPage({ params }: PageProps) {
   const session = await auth();
   if (!session) redirect("/login");
 
-  const { role, unitId: sessionUnitId } = session.user;
+  const { role, unitIds } = session.user;
   if (role === "MEMBER") redirect("/dashboard");
 
   const { id } = await params;
@@ -69,7 +69,7 @@ export default async function ServiceOrderDetailPage({ params }: PageProps) {
 
   if (!os) notFound();
 
-  if (role === "RECEPTIONIST" && os.unitId !== sessionUnitId) {
+  if (role === "RECEPTIONIST" && !unitIds.includes(os.unitId)) {
     redirect("/dashboard/admin/service-orders");
   }
 
@@ -99,7 +99,7 @@ export default async function ServiceOrderDetailPage({ params }: PageProps) {
           status={os.status}
           role={role}
           unitId={os.unitId}
-          userUnitId={sessionUnitId ?? null}
+          userUnitIds={unitIds}
         />
       </div>
 

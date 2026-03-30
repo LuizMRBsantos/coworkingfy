@@ -55,38 +55,10 @@ async function main() {
   // ---------------------------------------------------------------------------
 
   const users = [
-    {
-      id: "user-admin",
-      email: "admin@coworkingfy.com",
-      name: "Admin",
-      password: "Admin123",
-      role: Role.ADMIN,
-      unitId: null,
-    },
-    {
-      id: "user-recepcao",
-      email: "recepcao@coworkingfy.com",
-      name: "Recepção Coworking",
-      password: "Recepcao123",
-      role: Role.RECEPTIONIST,
-      unitId: coworking.id,
-    },
-    {
-      id: "user-membro",
-      email: "membro@coworkingfy.com",
-      name: "Membro Teste",
-      password: "Membro123",
-      role: Role.MEMBER,
-      unitId: coworking.id,
-    },
-    {
-      id: "user-ops-prudential",
-      email: "ops.prudential@coworkingfy.com",
-      name: "Ops Prudential CG",
-      password: "Ops123",
-      role: Role.RECEPTIONIST,
-      unitId: prudentialCG.id,
-    },
+    { id: "user-admin",          email: "admin@coworkingfy.com",          name: "Admin",              password: "Admin123",    role: Role.ADMIN },
+    { id: "user-recepcao",       email: "recepcao@coworkingfy.com",       name: "Recepção Coworking", password: "Recepcao123", role: Role.RECEPTIONIST },
+    { id: "user-membro",         email: "membro@coworkingfy.com",         name: "Membro Teste",       password: "Membro123",   role: Role.MEMBER },
+    { id: "user-ops-prudential", email: "ops.prudential@coworkingfy.com", name: "Ops Prudential",     password: "Ops123",      role: Role.RECEPTIONIST },
   ];
 
   console.log("✅ Usuários criados:");
@@ -101,10 +73,31 @@ async function main() {
         name: user.name,
         password: hashed,
         role: user.role,
-        unitId: user.unitId,
       },
     });
-    console.log(`   - ${user.email} (${user.role}${user.unitId ? ` — ${user.unitId}` : " — sem unidade fixa"})`);
+    console.log(`   - ${user.email} (${user.role})`);
+  }
+  console.log();
+
+  // ---------------------------------------------------------------------------
+  // 2b. Vínculos UserUnit
+  // ---------------------------------------------------------------------------
+
+  const userUnits = [
+    { id: "uu-recepcao-coworking",      userId: "user-recepcao",       unitId: coworking.id },
+    { id: "uu-membro-coworking",        userId: "user-membro",         unitId: coworking.id },
+    { id: "uu-ops-prudential-cg",       userId: "user-ops-prudential", unitId: prudentialCG.id },
+    { id: "uu-ops-prudential-dourados", userId: "user-ops-prudential", unitId: prudentialDourados.id },
+  ];
+
+  console.log("✅ Vínculos UserUnit criados:");
+  for (const uu of userUnits) {
+    await prisma.userUnit.upsert({
+      where: { id: uu.id },
+      update: {},
+      create: uu,
+    });
+    console.log(`   - ${uu.userId} → ${uu.unitId}`);
   }
   console.log();
 

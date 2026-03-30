@@ -20,7 +20,7 @@ export async function GET(
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
 
-  const { role, unitId } = session.user;
+  const { role, unitIds } = session.user;
   if (role === "MEMBER") return NextResponse.json({ error: "Sem permissão" }, { status: 403 });
 
   const { id } = await params;
@@ -42,7 +42,7 @@ export async function GET(
 
   if (!ticket) return NextResponse.json({ error: "Ticket não encontrado" }, { status: 404 });
 
-  if (role === "RECEPTIONIST" && ticket.unitId !== unitId) {
+  if (role === "RECEPTIONIST" && !unitIds.includes(ticket.unitId)) {
     return NextResponse.json({ error: "Sem permissão" }, { status: 403 });
   }
 

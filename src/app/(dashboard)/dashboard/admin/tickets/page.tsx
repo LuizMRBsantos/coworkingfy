@@ -21,13 +21,14 @@ export default async function TicketsPage({ searchParams }: PageProps) {
   const role = session.user.role;
   if (role === "MEMBER") redirect("/dashboard");
 
-  // RECEPTIONIST sempre vê só sua unidade — ignora ?unitId= da URL
-  const unitFilter = role === "ADMIN" ? unitId : (session.user.unitId ?? undefined);
+  // RECEPTIONIST vê só suas unidades — ignora ?unitId= da URL
+  const unitFilter = role === "ADMIN" ? unitId : undefined;
+  const unitIds = session.user.unitIds;
 
   const [tickets, units] = await Promise.all([
     db.ticket.findMany({
       where: {
-        ...(unitFilter ? { unitId: unitFilter } : {}),
+        ...(unitFilter ? { unitId: unitFilter } : role === "RECEPTIONIST" ? { unitId: { in: unitIds } } : {}),
         ...(status ? { status: status as TicketStatus } : {}),
       },
       orderBy: { createdAt: "desc" },
@@ -62,7 +63,7 @@ export default async function TicketsPage({ searchParams }: PageProps) {
       <TicketFilters
         units={units}
         currentStatus={status}
-        currentUnitId={unitFilter}
+        currentUnitId={role === "ADMIN" ? unitFilter : unitIds[0]}
         showUnitFilter={role === "ADMIN"}
       />
 

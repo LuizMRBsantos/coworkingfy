@@ -11,7 +11,7 @@ export default async function NewServiceOrderPage({ params }: PageProps) {
   const session = await auth();
   if (!session) redirect("/login");
 
-  const { role, unitId: sessionUnitId } = session.user;
+  const { role, unitIds } = session.user;
   if (role === "MEMBER") redirect("/dashboard");
 
   const { id: ticketId } = await params;
@@ -23,8 +23,8 @@ export default async function NewServiceOrderPage({ params }: PageProps) {
 
   if (!ticket) notFound();
 
-  // RECEPTIONIST só acessa tickets da sua unidade
-  if (role === "RECEPTIONIST" && ticket.unitId !== sessionUnitId) {
+  // RECEPTIONIST só acessa tickets das suas unidades
+  if (role === "RECEPTIONIST" && !unitIds.includes(ticket.unitId)) {
     redirect("/dashboard/admin/tickets");
   }
 

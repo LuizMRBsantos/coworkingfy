@@ -7,11 +7,11 @@ import { Button } from "@/components/ui/button";
 import type { Role, ServiceOrderStatus } from "@prisma/client";
 
 interface ServiceOrderActionsProps {
-  osId:       string;
-  status:     ServiceOrderStatus;
-  role:       Role;
-  unitId:     string;
-  userUnitId: string | null;
+  osId:        string;
+  status:      ServiceOrderStatus;
+  role:        Role;
+  unitId:      string;
+  userUnitIds: string[];
 }
 
 export function ServiceOrderActions({
@@ -19,14 +19,14 @@ export function ServiceOrderActions({
   status,
   role,
   unitId,
-  userUnitId,
+  userUnitIds,
 }: ServiceOrderActionsProps) {
   const router = useRouter();
   const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // RECEPTIONIST só age na sua unidade
-  if (role === "RECEPTIONIST" && unitId !== userUnitId) return null;
+  // RECEPTIONIST só age nas suas unidades
+  if (role === "RECEPTIONIST" && !userUnitIds.includes(unitId)) return null;
 
   async function transition(newStatus: ServiceOrderStatus) {
     setError(null);
