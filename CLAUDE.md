@@ -348,3 +348,21 @@ Impacto:
 - API routes: filtrar por unidades do usuário
 - NextAuth: session.user.unitIds string[] em vez de unitId string
 - Header: seletor mostra unidades do usuário (RECEPTIONIST)
+
+### [Refatoração] Múltiplas unidades por usuário
+Migration: refactor_user_multi_unit
+Tabela pivot: UserUnit (userId + unitId, @@unique)
+
+session.user.unitIds string[] (era unitId string)
+RECEPTIONIST filtra por { unitId: { in: unitIds } }
+ADMIN sem filtro de unidade por padrão
+
+Seed atualizado:
+- recepcao → Coworking
+- membro → Coworking  
+- ops.prudential → Prudential CG + Prudential Dourados
+- admin → sem unidade fixa
+
+Arquivos atualizados:
+- auth.ts, proxy.ts
+- 4 API routes, 5 páginas, ServiceOrderActions
