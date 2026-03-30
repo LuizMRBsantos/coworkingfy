@@ -13,7 +13,7 @@ interface ServiceOrderCardProps {
     createdAt: Date;
     slaDeadline: Date | null;
     unit: { id: string; name: string };
-    createdBy: { id: string; name: string };
+    createdBy: { id: string; name: string | null };
     provider: { id: string; name: string; type: ProviderType } | null;
   };
 }

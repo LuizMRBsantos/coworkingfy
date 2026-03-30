@@ -50,12 +50,12 @@ export default async function TicketsPage({ searchParams }: PageProps) {
           </p>
         </div>
         {role === "ADMIN" && (
-          <Button asChild>
-            <Link href="/dashboard/admin/tickets/new">
+          <Link href="/dashboard/admin/tickets/new">
+            <Button>
               <Plus className="h-4 w-4 mr-2" />
               Novo Ticket
-            </Link>
-          </Button>
+            </Button>
+          </Link>
         )}
       </div>
 

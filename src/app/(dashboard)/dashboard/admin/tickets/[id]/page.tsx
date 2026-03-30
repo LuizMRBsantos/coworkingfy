@@ -92,12 +92,12 @@ export default async function TicketDetailPage({ params }: PageProps) {
           </p>
         </div>
 
-        <Button asChild>
-          <Link href={`/dashboard/admin/tickets/${id}/service-orders/new`}>
+        <Link href={`/dashboard/admin/tickets/${id}/service-orders/new`}>
+          <Button>
             <Plus className="h-4 w-4 mr-2" />
             Nova OS
-          </Link>
-        </Button>
+          </Button>
+        </Link>
       </div>
 
       {/* Descrição */}
