@@ -19,7 +19,7 @@ vi.mock("@/lib/db", () => ({
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { GET, POST } from "@/app/api/service-orders/route";
-import { GET as getById, PUT } from "@/app/api/service-orders/[id]/route";
+import { PUT } from "@/app/api/service-orders/[id]/route";
 
 // ── Sessões ──────────────────────────────────────────────────────────────────
 
@@ -38,9 +38,9 @@ const memberSession = {
 const mockOS = {
   id: "so-1",
   number: "OS-2026-0001",
+  ticketId: "ticket-1",
   unitId: "unit-1",
   status: "DRAFT" as const,
-  priority: "HIGH" as const,
   serviceType: "CLEANING" as const,
   description: "Limpeza geral da sala",
   createdById: "recep-id",
@@ -49,10 +49,14 @@ const mockOS = {
   approvedAt: null,
   slaDeadline: null,
   spaceId: null,
+  scheduledDate: null,
+  value: null,
+  photos: [],
   createdAt: new Date(),
   updatedAt: new Date(),
   unit: { id: "unit-1", name: "Coworking" },
   createdBy: { id: "recep-id", name: "Recep" },
+  ticket: { priority: "HIGH" as const },
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -130,10 +134,10 @@ describe("GET /api/service-orders", () => {
 
 describe("POST /api/service-orders", () => {
   const validBody = {
+    ticketId: "ticket-1",
     unitId: "unit-1",
     serviceType: "CLEANING",
     description: "Limpeza geral da sala de reunião",
-    priority: "HIGH",
   };
 
   test("MEMBER recebe 403", async () => {
@@ -158,14 +162,14 @@ describe("POST /api/service-orders", () => {
 
   test("RECEPTIONIST cria OS com status DRAFT", async () => {
     vi.mocked(auth).mockResolvedValue(receptionistSession as never);
-    vi.mocked(db.$transaction).mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) => {
+    vi.mocked(db.$transaction).mockImplementation(async (fn: Parameters<typeof db.$transaction>[0]) => {
       const mockTx = {
         serviceOrder: {
           count: vi.fn().mockResolvedValue(0),
           create: vi.fn().mockResolvedValue({ ...mockOS, status: "DRAFT" }),
         },
       };
-      return fn(mockTx);
+      return fn(mockTx as never);
     });
 
     const res = await POST(makePostRequest(validBody));

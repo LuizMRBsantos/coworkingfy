@@ -310,3 +310,27 @@ Status atual:
 - API de OS testada e funcionando localmente
 - CI corrigido — aguardando confirmação do GitHub Actions
 - Próximo passo: UI das Ordens de Serviço
+
+## [Fase 3] Refatoração do schema — Ticket + ServiceOrder
+
+Arquitetura final:
+- Ticket (SLA) → criado pelo ADMIN a partir do chamado do cliente
+- ServiceOrder (OS) → criada pela RECEPTIONIST vinculada ao Ticket
+- 1 Ticket pode ter N ServiceOrders
+
+Mudanças no schema:
+- Priority movida de ServiceOrder para Ticket
+- ServiceOrder.ticketId obrigatório
+- ServiceOrder.value Decimal? — valor para aprovação
+- ServiceOrder.scheduledDate DateTime? — data de execução
+- ServiceOrder.photos String[] — URLs de fotos opcionais
+- slaDeadline calculado com priority do Ticket pai
+
+Migration aplicada: add_ticket_model
+
+API corrigida:
+- calculateSlaDeadline usa ticket.priority
+- POST de OS recebe ticketId obrigatório
+- Validations atualizadas para Zod v4
+
+Próximo passo: UI de Tickets e formulário de OS vinculada ao Ticket
