@@ -1,14 +1,13 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Building2, Calendar, User, Wrench, AlertCircle } from "lucide-react";
-import type { Priority, ProviderType, ServiceOrderStatus, ServiceType } from "@prisma/client";
+import type { ProviderType, ServiceOrderStatus, ServiceType } from "@prisma/client";
 
 interface ServiceOrderCardProps {
   serviceOrder: {
     id: string;
     number: string;
     status: ServiceOrderStatus;
-    priority: Priority;
     serviceType: ServiceType;
     description: string;
     createdAt: Date;
@@ -39,20 +38,6 @@ const STATUS_CLASS: Record<ServiceOrderStatus, string> = {
   CANCELLED: "bg-gray-200 text-gray-600 hover:bg-gray-200",
 };
 
-const PRIORITY_LABEL: Record<Priority, string> = {
-  LOW: "Baixa",
-  MEDIUM: "Média",
-  HIGH: "Alta",
-  URGENT: "Urgente",
-};
-
-const PRIORITY_CLASS: Record<Priority, string> = {
-  LOW: "bg-gray-100 text-gray-600 hover:bg-gray-100",
-  MEDIUM: "bg-blue-100 text-blue-700 hover:bg-blue-100",
-  HIGH: "bg-orange-100 text-orange-700 hover:bg-orange-100",
-  URGENT: "bg-red-100 text-red-700 hover:bg-red-100",
-};
-
 const SERVICE_TYPE_LABEL: Record<ServiceType, string> = {
   CLEANING: "Limpeza",
   ELECTRICAL: "Elétrica",
@@ -76,7 +61,6 @@ export function ServiceOrderCard({ serviceOrder: os }: ServiceOrderCardProps) {
             <div className="flex flex-wrap items-center gap-2 mb-2">
               <span className="font-mono text-sm font-semibold text-gray-900">{os.number}</span>
               <Badge className={STATUS_CLASS[os.status]}>{STATUS_LABEL[os.status]}</Badge>
-              <Badge className={PRIORITY_CLASS[os.priority]}>{PRIORITY_LABEL[os.priority]}</Badge>
               {isOverdue && (
                 <span className="flex items-center gap-1 text-xs text-red-600 font-medium">
                   <AlertCircle className="h-3.5 w-3.5" />
