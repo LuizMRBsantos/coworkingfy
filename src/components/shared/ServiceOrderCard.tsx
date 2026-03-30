@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Building2, Calendar, User, Wrench, AlertCircle, DollarSign } from "lucide-react";
@@ -54,7 +55,8 @@ export function ServiceOrderCard({ serviceOrder: os }: ServiceOrderCardProps) {
     os.status !== "CANCELLED";
 
   return (
-    <Card className={isOverdue ? "border-red-300 bg-red-50/30" : ""}>
+    <Link href={`/dashboard/admin/service-orders/${os.id}`} className="block">
+      <Card className={`hover:border-gray-300 transition-colors cursor-pointer${isOverdue ? " border-red-300 bg-red-50/30" : ""}`}>
       <CardContent className="p-5">
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1 min-w-0">
@@ -123,6 +125,7 @@ export function ServiceOrderCard({ serviceOrder: os }: ServiceOrderCardProps) {
           )}
         </div>
       </CardContent>
-    </Card>
+      </Card>
+    </Link>
   );
 }
