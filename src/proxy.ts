@@ -32,8 +32,17 @@ export default auth((req) => {
     return NextResponse.redirect(new URL(getRoleRedirect(role), req.url));
   }
 
-  // /dashboard/admin/* → só ADMIN
-  if (pathname.startsWith("/dashboard/admin") && role !== "ADMIN") {
+  // /dashboard/admin/tickets e /dashboard/admin/service-orders → ADMIN + RECEPTIONIST
+  const receptionistAllowed =
+    pathname.startsWith("/dashboard/admin/tickets") ||
+    pathname.startsWith("/dashboard/admin/service-orders");
+
+  // /dashboard/admin/* restante → só ADMIN
+  if (
+    pathname.startsWith("/dashboard/admin") &&
+    role !== "ADMIN" &&
+    !(role === "RECEPTIONIST" && receptionistAllowed)
+  ) {
     return NextResponse.redirect(new URL("/dashboard", req.url));
   }
 
