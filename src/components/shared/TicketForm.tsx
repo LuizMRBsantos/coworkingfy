@@ -81,10 +81,10 @@ export function TicketForm({ units }: TicketFormProps) {
               control={control}
               render={({ field }) => (
                 <Select value={field.value ?? ""} onValueChange={field.onChange}>
-                  <SelectTrigger id="unitId">
+                  <SelectTrigger id="unitId" className="w-full">
                     <SelectValue placeholder="Selecione a unidade" />
                   </SelectTrigger>
-                  <SelectContent alignItemWithTrigger={false}>
+                  <SelectContent className="min-w-70" alignItemWithTrigger={false}>
                     {units.map((u) => (
                       <SelectItem key={u.id} value={u.id}>
                         {u.name}
