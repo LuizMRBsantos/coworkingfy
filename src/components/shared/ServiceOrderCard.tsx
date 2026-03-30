@@ -1,7 +1,7 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Building2, Calendar, User, Wrench, AlertCircle } from "lucide-react";
-import type { ProviderType, ServiceOrderStatus, ServiceType } from "@prisma/client";
+import { Building2, Calendar, User, Wrench, AlertCircle, DollarSign } from "lucide-react";
+import type { Prisma, ProviderType, ServiceOrderStatus, ServiceType } from "@prisma/client";
 
 interface ServiceOrderCardProps {
   serviceOrder: {
@@ -12,6 +12,7 @@ interface ServiceOrderCardProps {
     description: string;
     createdAt: Date;
     slaDeadline: Date | null;
+    value: Prisma.Decimal | null;
     unit: { id: string; name: string };
     createdBy: { id: string; name: string | null };
     provider: { id: string; name: string; type: ProviderType } | null;
@@ -95,6 +96,15 @@ export function ServiceOrderCard({ serviceOrder: os }: ServiceOrderCardProps) {
                 <Calendar className="h-3.5 w-3.5" />
                 {new Date(os.createdAt).toLocaleDateString("pt-BR")}
               </span>
+              {os.value && (
+                <span className="flex items-center gap-1">
+                  <DollarSign className="h-3.5 w-3.5" />
+                  {Number(os.value).toLocaleString("pt-BR", {
+                    style: "currency",
+                    currency: "BRL",
+                  })}
+                </span>
+              )}
             </div>
           </div>
 
