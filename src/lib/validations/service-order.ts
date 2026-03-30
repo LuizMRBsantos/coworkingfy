@@ -1,13 +1,15 @@
 import { z } from "zod";
-import { ServiceType, Priority } from "@prisma/client";
+import { ServiceType } from "@prisma/client";
 
 export const CreateServiceOrderSchema = z.object({
+  ticketId: z.string().min(1, "Ticket é obrigatório"),
   unitId: z.string().min(1),
   spaceId: z.string().optional(),
-  serviceType: z.nativeEnum(ServiceType),
+  serviceType: z.enum(ServiceType),
   description: z.string().min(10, "Descrição deve ter pelo menos 10 caracteres"),
-  priority: z.nativeEnum(Priority),
   providerId: z.string().optional(),
+  scheduledDate: z.iso.datetime().optional(),
+  value: z.number().positive().optional(),
 });
 
 // Apenas status alcançáveis via PUT — DRAFT é só criação

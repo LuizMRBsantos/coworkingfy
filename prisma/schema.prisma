@@ -41,6 +41,12 @@ enum BookingStatus {
   CANCELLED
 }
 
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  CLOSED
+}
+
 enum ServiceOrderStatus {
   DRAFT
   PENDING_APPROVAL
@@ -85,10 +91,11 @@ model Unit {
   type      UnitType
   createdAt DateTime @default(now())
 
-  users          User[]
-  spaces         Space[]
-  serviceOrders  ServiceOrder[]
-  providers      Provider[]
+  users         User[]
+  spaces        Space[]
+  tickets       Ticket[]
+  serviceOrders ServiceOrder[]
+  providers     Provider[]
 
   @@map("units")
 }
@@ -106,10 +113,11 @@ model User {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  unit                   Unit?          @relation(fields: [unitId], references: [id])
-  bookings               Booking[]
-  serviceOrdersCreated   ServiceOrder[] @relation("ServiceOrderCreatedBy")
-  serviceOrdersApproved  ServiceOrder[] @relation("ServiceOrderApprovedBy")
+  unit                  Unit?          @relation(fields: [unitId], references: [id])
+  bookings              Booking[]
+  ticketsCreated        Ticket[]       @relation("TicketCreatedBy")
+  serviceOrdersCreated  ServiceOrder[] @relation("ServiceOrderCreatedBy")
+  serviceOrdersApproved ServiceOrder[] @relation("ServiceOrderApprovedBy")
 
   // NextAuth v5
   accounts Account[]
@@ -157,29 +165,56 @@ model Booking {
   @@map("bookings")
 }
 
+model Ticket {
+  id               String       @id @default(cuid())
+  number           String       @unique // TK-2026-0001
+  externalTicketId String?               // número no sistema do cliente (ex: TICK-2026-0847)
+  unitId           String
+  description      String
+  priority         Priority
+  status           TicketStatus @default(OPEN)
+  createdById      String
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  unit          Unit           @relation(fields: [unitId], references: [id])
+  createdBy     User           @relation("TicketCreatedBy", fields: [createdById], references: [id])
+  serviceOrders ServiceOrder[]
+
+  @@index([unitId])
+  @@index([createdById])
+  @@index([status])
+  @@map("tickets")
+}
+
 model ServiceOrder {
-  id           String             @id @default(cuid())
-  number       String             @unique // gerado na camada de aplicação: OS-2026-0001
-  unitId       String
-  spaceId      String?            // opcional — OS do coworking pode ter espaço afetado
-  createdById  String
-  providerId   String?            // opcional — pode ser definido após aprovação
-  approvedById String?
-  serviceType  ServiceType
-  description  String
-  priority     Priority
-  status       ServiceOrderStatus @default(DRAFT)
-  approvedAt   DateTime?
-  slaDeadline  DateTime?          // calculado na camada de aplicação quando status → APPROVED
-  createdAt    DateTime           @default(now())
-  updatedAt    DateTime           @updatedAt
+  id            String             @id @default(cuid())
+  number        String             @unique // OS-2026-0001
+  ticketId      String
+  unitId        String             // herdado do ticket — mantido para queries eficientes por unidade
+  spaceId       String?            // opcional — OS do coworking pode ter espaço afetado
+  createdById   String
+  providerId    String?            // opcional — pode ser definido após aprovação
+  approvedById  String?
+  serviceType   ServiceType
+  description   String
+  status        ServiceOrderStatus @default(DRAFT)
+  scheduledDate DateTime?
+  value         Decimal?
+  photos        String[]           @default([])
+  approvedAt    DateTime?
+  slaDeadline   DateTime?          // calculado na aprovação usando ticket.priority
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
 
-  unit        Unit      @relation(fields: [unitId], references: [id])
-  space       Space?    @relation(fields: [spaceId], references: [id])
-  createdBy   User      @relation("ServiceOrderCreatedBy", fields: [createdById], references: [id])
-  provider    Provider? @relation(fields: [providerId], references: [id])
-  approvedBy  User?     @relation("ServiceOrderApprovedBy", fields: [approvedById], references: [id])
+  ticket     Ticket    @relation(fields: [ticketId], references: [id])
+  unit       Unit      @relation(fields: [unitId], references: [id])
+  space      Space?    @relation(fields: [spaceId], references: [id])
+  createdBy  User      @relation("ServiceOrderCreatedBy", fields: [createdById], references: [id])
+  provider   Provider? @relation(fields: [providerId], references: [id])
+  approvedBy User?     @relation("ServiceOrderApprovedBy", fields: [approvedById], references: [id])
 
+  @@index([ticketId])
   @@index([unitId])
   @@index([createdById])
   @@index([status])
@@ -187,15 +222,15 @@ model ServiceOrder {
 }
 
 model Provider {
-  id          String         @id @default(cuid())
-  unitId      String
-  name        String
-  specialty   ServiceType
-  phone       String?
-  email       String?
-  type        ProviderType
-  status      ProviderStatus @default(ACTIVE)
-  createdAt   DateTime       @default(now())
+  id        String         @id @default(cuid())
+  unitId    String
+  name      String
+  specialty ServiceType
+  phone     String?
+  email     String?
+  type      ProviderType
+  status    ProviderStatus @default(ACTIVE)
+  createdAt DateTime       @default(now())
 
   unit          Unit           @relation(fields: [unitId], references: [id])
   serviceOrders ServiceOrder[]

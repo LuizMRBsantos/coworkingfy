@@ -62,30 +62,51 @@ Status: CONFIRMED, CANCELLED
 
 ## Ordens de Serviço — OS (todas as unidades)
 
+Criada pela RECEPTIONIST vinculada a um Ticket.
+Representa a execução de um serviço específico.
+
 Fluxo de aprovação:
-```
 DRAFT → PENDING_APPROVAL → APPROVED → IN_PROGRESS → DONE
-                        ↓
-                     REJECTED
-```
+ou REJECTED / CANCELLED
 
 Quem faz o quê:
-- RECEPTIONIST → cria OS (DRAFT), envia para aprovação
-- ADMIN → aprova (APPROVED) ou rejeita (REJECTED)
-- RECEPTIONIST → atualiza para IN_PROGRESS quando prestador inicia
-- ADMIN → fecha como DONE
+- RECEPTIONIST → cria OS, atualiza para IN_PROGRESS
+- ADMIN → aprova, rejeita, fecha como DONE
 
 Campos:
-- Número sequencial por unidade (OS-2026-0001)
-- Unidade vinculada
-- Espaço afetado (opcional — para OS do coworking)
+- Número sequencial: OS-2026-0001
+- ticketId → ticket pai (obrigatório)
+- Unidade (herdada do ticket)
+- Espaço afetado (opcional, só coworking)
 - Tipo de serviço: CLEANING, ELECTRICAL, HYDRAULIC, OTHER
 - Descrição
-- Prestador vinculado
+- Prestador vinculado (opcional no DRAFT)
 - Prioridade: LOW, MEDIUM, HIGH, URGENT
-- Status
-- Aprovado por (User) + data de aprovação
+- Data agendada (scheduledDate)
+- Valor estimado (para aprovação do gestor)
+- Fotos opcionais (URLs)
+- Status com aprovação
+- approvedById + approvedAt
+- slaDeadline (calculado na aprovação)
 - createdAt, updatedAt
+
+## Tickets / SLA (todas as unidades)
+
+Criado pelo ADMIN a partir de chamados do sistema do cliente.
+1 Ticket pode ter várias OS vinculadas.
+
+Campos:
+- Número sequencial interno: TK-2026-0001
+- Número do chamado externo (ex: TICK-2026-0847)
+- Unidade vinculada
+- Descrição do problema
+- Status: OPEN → IN_PROGRESS → CLOSED
+- createdAt, updatedAt
+
+Quem faz o quê:
+- ADMIN → cria ticket, fecha ticket
+- RECEPTIONIST → visualiza tickets da sua unidade, cria OS filhas
+- MEMBER → sem acesso a tickets
 
 ## SLA por prioridade
 

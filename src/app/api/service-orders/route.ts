@@ -68,13 +68,15 @@ export async function POST(req: Request) {
         return tx.serviceOrder.create({
           data: {
             number,
+            ticketId: data.ticketId,
             unitId: data.unitId,
             spaceId: data.spaceId,
             createdById: userId,
             serviceType: data.serviceType,
             description: data.description,
-            priority: data.priority,
             providerId: data.providerId,
+            scheduledDate: data.scheduledDate ? new Date(data.scheduledDate) : undefined,
+            value: data.value ? new Prisma.Decimal(data.value) : undefined,
             status: "DRAFT",
           },
           include: {

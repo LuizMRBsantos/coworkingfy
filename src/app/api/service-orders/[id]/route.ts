@@ -82,7 +82,10 @@ export async function PUT(
   const { status: newStatus, providerId } = parsed.data;
   const { id } = await params;
 
-  const serviceOrder = await db.serviceOrder.findUnique({ where: { id } });
+  const serviceOrder = await db.serviceOrder.findUnique({
+    where: { id },
+    include: { ticket: { select: { priority: true } } },
+  });
   if (!serviceOrder) return NextResponse.json({ error: "OS não encontrada" }, { status: 404 });
 
   if (role === "RECEPTIONIST" && serviceOrder.unitId !== unitId) {
@@ -111,7 +114,7 @@ export async function PUT(
   if (newStatus === "APPROVED") {
     extraData.approvedById = userId;
     extraData.approvedAt = now;
-    extraData.slaDeadline = calculateSlaDeadline(serviceOrder.priority, now);
+    extraData.slaDeadline = calculateSlaDeadline(serviceOrder.ticket.priority, now);
   }
 
   if (providerId !== undefined) {
