@@ -6,6 +6,7 @@ import Link from "next/link";
 import {
   LayoutDashboard,
   ClipboardList,
+  FileText,
   Building2,
   Calendar,
   Users,
@@ -36,6 +37,7 @@ function getNavSections(role: Role): NavSection[] {
         title: "PRINCIPAL",
         items: [
           { label: "Painel", href: "/dashboard/admin", icon: LayoutDashboard },
+          { label: "Tickets / SLA", href: "/dashboard/admin/tickets", icon: FileText },
           { label: "Ordens de Serviço", href: "/dashboard/admin/service-orders", icon: ClipboardList },
         ],
       },
@@ -70,6 +72,7 @@ function getNavSections(role: Role): NavSection[] {
         title: "PRINCIPAL",
         items: [
           { label: "Painel", href: "/dashboard/reception", icon: LayoutDashboard },
+          { label: "Tickets / SLA", href: "/dashboard/admin/tickets", icon: FileText },
           { label: "Ordens de Serviço", href: "/dashboard/reception/service-orders", icon: ClipboardList },
         ],
       },
