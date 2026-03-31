@@ -366,3 +366,16 @@ Seed atualizado:
 Arquivos atualizados:
 - auth.ts, proxy.ts
 - 4 API routes, 5 páginas, ServiceOrderActions
+
+### [Bug] proxy.ts — Edge Runtime bloqueando sessão
+O proxy.ts precisa ter `export const runtime = "nodejs"` no topo.
+Sem isso o NextAuth com Prisma/bcrypt falha silenciosamente 
+no Edge Runtime — sessão retorna null — causando redirects errados.
+Sintoma: clicar em cards redirecionava para área errada.
+Solução: export const runtime = "nodejs" no início do proxy.ts.
+
+### [Bug] ServiceOrderActions — ADMIN bloqueado por unidade
+ADMIN tem unitIds = [] (sem unidades vinculadas).
+A verificação !userUnitIds.includes(unitId) bloqueava o ADMIN
+de aprovar/rejeitar OS de qualquer unidade.
+Solução: verificar unidade apenas para RECEPTIONIST, nunca para ADMIN.

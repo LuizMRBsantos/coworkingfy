@@ -25,7 +25,8 @@ export function ServiceOrderActions({
   const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // RECEPTIONIST só age nas suas unidades
+  // MEMBER nunca tem ações; RECEPTIONIST só age nas suas unidades; ADMIN age em tudo
+  if (role === "MEMBER") return null;
   if (role === "RECEPTIONIST" && !userUnitIds.includes(unitId)) return null;
 
   async function transition(newStatus: ServiceOrderStatus) {
