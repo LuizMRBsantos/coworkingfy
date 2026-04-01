@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ServiceOrderCard } from "@/components/shared/ServiceOrderCard";
+import { TicketActions } from "@/components/shared/TicketActions";
 import { Building2, Hash, Plus } from "lucide-react";
 import type { Priority, TicketStatus } from "@prisma/client";
 
@@ -92,12 +93,15 @@ export default async function TicketDetailPage({ params }: PageProps) {
           </p>
         </div>
 
-        <Link href={`/dashboard/admin/tickets/${id}/service-orders/new`}>
-          <Button>
-            <Plus className="h-4 w-4 mr-2" />
-            Nova OS
-          </Button>
-        </Link>
+        <div className="flex flex-col items-end gap-2">
+          <TicketActions ticketId={id} status={ticket.status} role={role} />
+          <Link href={`/dashboard/admin/tickets/${id}/service-orders/new`}>
+            <Button variant="outline">
+              <Plus className="h-4 w-4 mr-2" />
+              Nova OS
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {/* Descrição */}
