@@ -83,6 +83,18 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   const user = await db.user.findUnique({ where: { id } });
   if (!user) return NextResponse.json({ error: "Usuário não encontrado" }, { status: 404 });
 
-  await db.user.update({ where: { id }, data: { active: false } });
-  return NextResponse.json({ message: "Usuário desativado com sucesso" });
+  const [ticketCount, osCount] = await Promise.all([
+    db.ticket.count({ where: { createdById: id } }),
+    db.serviceOrder.count({ where: { createdById: id } }),
+  ]);
+
+  if (ticketCount > 0 || osCount > 0) {
+    return NextResponse.json(
+      { error: "Não é possível apagar usuário com registros vinculados (tickets ou ordens de serviço)" },
+      { status: 400 }
+    );
+  }
+
+  await db.user.delete({ where: { id } });
+  return NextResponse.json({ message: "Usuário apagado com sucesso" });
 }

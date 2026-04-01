@@ -68,11 +68,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             name: true,
             password: true,
             role: true,
+            active: true,
             userUnits: { select: { unitId: true } },
           },
         });
 
         if (!user?.password) return null;
+        if (!user.active) return null;
 
         const passwordValid = await bcrypt.compare(password, user.password);
         if (!passwordValid) return null;

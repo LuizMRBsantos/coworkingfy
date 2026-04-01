@@ -3,7 +3,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { Badge } from "@/components/ui/badge";
 import { UserForm } from "@/components/shared/UserForm";
-import { UserDeactivateButton } from "@/components/shared/UserDeactivateButton";
+import { UserDeleteButton } from "@/components/shared/UserDeleteButton";
 import type { Role } from "@prisma/client";
 
 interface PageProps {
@@ -65,9 +65,8 @@ export default async function UserDetailPage({ params }: PageProps) {
           </div>
           <p className="text-sm text-gray-500 mt-1">{user.email}</p>
         </div>
-        <UserDeactivateButton
+        <UserDeleteButton
           userId={user.id}
-          active={user.active}
           isSelf={user.id === session.user.id}
         />
       </div>
