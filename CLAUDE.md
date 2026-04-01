@@ -379,3 +379,27 @@ ADMIN tem unitIds = [] (sem unidades vinculadas).
 A verificação !userUnitIds.includes(unitId) bloqueava o ADMIN
 de aprovar/rejeitar OS de qualquer unidade.
 Solução: verificar unidade apenas para RECEPTIONIST, nunca para ADMIN.
+
+### [Bug] ServiceOrderActions — ADMIN bloqueado por unidade
+ADMIN tem unitIds = [] — a verificação !userUnitIds.includes(unitId)
+bloqueava ADMIN de aprovar OS de qualquer unidade.
+Solução: verificar unidade apenas para RECEPTIONIST.
+if (role === "MEMBER") return null;
+if (role === "RECEPTIONIST" && !userUnitIds.includes(unitId)) return null;
+
+### [Fase 4] Módulo de usuários completo
+Arquivos criados:
+- src/app/api/users/route.ts — GET + POST
+- src/app/api/users/[id]/route.ts — GET + PUT + DELETE (desativa)
+- src/app/(dashboard)/dashboard/admin/users/page.tsx
+- src/app/(dashboard)/dashboard/admin/users/new/page.tsx
+- src/app/(dashboard)/dashboard/admin/users/[id]/page.tsx
+- src/components/shared/UserForm.tsx — modo criação e edição
+- src/components/shared/UserDeactivateButton.tsx
+Campo active Boolean @default(true) adicionado ao User.
+Migration: refactor_user_multi_unit_and_active
+
+### [Fase 4] TicketActions — fechar e iniciar tickets
+src/components/shared/TicketActions.tsx criado.
+ADMIN pode mover ticket: OPEN → IN_PROGRESS → CLOSED.
+Adicionado no cabeçalho de tickets/[id]/page.tsx.
