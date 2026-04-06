@@ -10,7 +10,6 @@ import {
   Building2,
   Calendar,
   Users,
-  UserCheck,
   BarChart3,
   UserCog,
   Building,
@@ -51,8 +50,7 @@ function getNavSections(role: Role): NavSection[] {
       {
         title: "PRESTADORES",
         items: [
-          { label: "Recorrentes", href: "/dashboard/admin/providers/recurring", icon: Users },
-          { label: "Pontuais", href: "/dashboard/admin/providers/punctual", icon: UserCheck },
+          { label: "Prestadores", href: "/dashboard/admin/providers", icon: Users },
         ],
       },
       {
@@ -79,8 +77,7 @@ function getNavSections(role: Role): NavSection[] {
       {
         title: "PRESTADORES",
         items: [
-          { label: "Recorrentes", href: "/dashboard/reception/providers/recurring", icon: Users },
-          { label: "Pontuais", href: "/dashboard/reception/providers/punctual", icon: UserCheck },
+          { label: "Prestadores", href: "/dashboard/reception/providers", icon: Users },
         ],
       },
     ];
