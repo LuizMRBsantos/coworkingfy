@@ -24,13 +24,6 @@ declare module "next-auth" {
   }
 }
 
-declare module "next-auth/jwt" {
-  interface JWT {
-    id: string;
-    role: Role;
-    unitIds: string[];
-  }
-}
 
 // ---------------------------------------------------------------------------
 // Validação do payload de credentials
@@ -102,9 +95,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
 
     session({ session, token }) {
-      session.user.id = token.id;
-      session.user.role = token.role;
-      session.user.unitIds = token.unitIds;
+      session.user.id      = token.id      as string;
+      session.user.role    = token.role    as Role;
+      session.user.unitIds = token.unitIds as string[];
       return session;
     },
   },

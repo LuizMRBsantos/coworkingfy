@@ -26,7 +26,7 @@ const schema = z.object({
   providerId:    z.string().optional(),
   spaceId:       z.string().optional(),
   scheduledDate: z.string().optional(),
-  value:         z.coerce.number().positive("Valor deve ser positivo").optional(),
+  value:         z.number().positive("Valor deve ser positivo").optional(),
 });
 
 type FormData = z.infer<typeof schema>;
@@ -235,7 +235,7 @@ export function TicketServiceOrderForm({
               min="0"
               step="0.01"
               placeholder="0,00"
-              {...register("value")}
+              {...register("value", { valueAsNumber: true })}
             />
             {errors.value && (
               <p className="text-sm text-red-500">{errors.value.message}</p>

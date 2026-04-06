@@ -37,8 +37,10 @@ enum SpaceStatus {
 }
 
 enum BookingStatus {
+  PENDING_APPROVAL
   CONFIRMED
   CANCELLED
+  REJECTED
 }
 
 enum TicketStatus {
@@ -114,6 +116,7 @@ model User {
 
   userUnits             UserUnit[]
   bookings              Booking[]
+  bookingsApproved      Booking[]      @relation("BookingApprovedBy")
   ticketsCreated        Ticket[]       @relation("TicketCreatedBy")
   serviceOrdersCreated  ServiceOrder[] @relation("ServiceOrderCreatedBy")
   serviceOrdersApproved ServiceOrder[] @relation("ServiceOrderApprovedBy")
@@ -159,21 +162,25 @@ model Space {
 }
 
 model Booking {
-  id        String        @id @default(cuid())
-  userId    String
-  spaceId   String
-  startTime DateTime
-  endTime   DateTime
-  status    BookingStatus @default(CONFIRMED)
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
+  id           String        @id @default(cuid())
+  userId       String
+  spaceId      String
+  startTime    DateTime
+  endTime      DateTime
+  status       BookingStatus @default(PENDING_APPROVAL)
+  approvedById String?       // quem aprovou ou rejeitou
+  approvedAt   DateTime?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
 
-  user  User  @relation(fields: [userId], references: [id])
-  space Space @relation(fields: [spaceId], references: [id])
+  user       User  @relation(fields: [userId], references: [id])
+  space      Space @relation(fields: [spaceId], references: [id])
+  approvedBy User? @relation("BookingApprovedBy", fields: [approvedById], references: [id])
 
   // Índice composto para queries de detecção de conflito de horário
   @@index([spaceId, startTime, endTime])
   @@index([userId])
+  @@index([status])
   @@map("bookings")
 }
 

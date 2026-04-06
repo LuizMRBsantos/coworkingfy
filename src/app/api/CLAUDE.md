@@ -75,7 +75,14 @@ if (!parsed.success) {
 - GET → ADMIN + RECEPTIONIST (sua unidade)
 - POST/PUT → ADMIN + RECEPTIONIST (sua unidade)
 
-### Space + Booking
-- GET → todos autenticados
-- POST Booking → MEMBER + RECEPTIONIST + ADMIN
-- POST/PUT Space → só ADMIN
+### Space
+- GET → ADMIN + RECEPTIONIST (MEMBER bloqueado)
+- POST/PUT → só ADMIN
+- POST valida: unidade deve ser COWORKING, caso contrário retorna 400 INVALID_UNIT_TYPE
+
+### Booking
+- GET → MEMBER vê só as suas; RECEPTIONIST filtra por space.unitId; ADMIN vê tudo
+- POST → todos autenticados (MEMBER, RECEPTIONIST, ADMIN)
+  - Validações na API (antes da transação): OUT_OF_HOURS, INVALID_RANGE, TOO_SHORT, PAST_DATE
+  - Validações na transação: SPACE_NOT_FOUND, SPACE_MAINTENANCE, SPACE_INACTIVE, CONFLICT
+- DELETE → cancela reserva; MEMBER só cancela a própria; regra TOO_LATE (CANCEL_HOURS_BEFORE)

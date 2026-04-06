@@ -403,3 +403,102 @@ Migration: refactor_user_multi_unit_and_active
 src/components/shared/TicketActions.tsx criado.
 ADMIN pode mover ticket: OPEN → IN_PROGRESS → CLOSED.
 Adicionado no cabeçalho de tickets/[id]/page.tsx.
+
+### [Fase 5] Espaços e Prestadores completo
+Arquivos criados:
+- src/app/api/spaces/route.ts — GET + POST
+- src/app/api/spaces/[id]/route.ts — GET + PUT
+- src/app/api/providers/route.ts — GET + POST
+- src/app/api/providers/[id]/route.ts — GET + PUT
+- src/components/shared/SpaceCard.tsx
+- src/components/shared/SpaceForm.tsx — tipo bloqueado na edição
+- src/components/shared/ProviderCard.tsx
+- src/components/shared/ProviderForm.tsx — suporte a fixedUnitId para reception
+- src/app/(dashboard)/dashboard/admin/spaces/page.tsx — filtros por tipo e status
+- src/app/(dashboard)/dashboard/admin/spaces/new/page.tsx
+- src/app/(dashboard)/dashboard/admin/spaces/[id]/page.tsx
+- src/app/(dashboard)/dashboard/admin/providers/page.tsx — filtros por tipo e unidade
+- src/app/(dashboard)/dashboard/admin/providers/new/page.tsx
+- src/app/(dashboard)/dashboard/admin/providers/[id]/page.tsx
+- src/app/(dashboard)/dashboard/reception/providers/page.tsx — filtro automático por unidade
+- src/app/(dashboard)/dashboard/reception/providers/new/page.tsx
+- src/app/(dashboard)/dashboard/reception/providers/[id]/page.tsx
+
+Regras de acesso:
+- Space GET: ADMIN + RECEPTIONIST. POST/PUT: só ADMIN
+- Provider GET/POST/PUT: ADMIN + RECEPTIONIST (restrito à sua unidade)
+- Espaços só existem em unidades COWORKING — API valida isso no POST
+
+Sidebar simplificado: "Recorrentes" e "Pontuais" unificados em "Prestadores"
+com link único para /dashboard/admin/providers e /dashboard/reception/providers.
+
+### [Fase 6] Reservas completo
+Arquivos criados:
+- src/app/api/bookings/route.ts — GET + POST com validação completa
+- src/app/api/bookings/[id]/route.ts — GET + DELETE (cancelamento)
+- src/components/shared/BookingCard.tsx
+- src/components/shared/BookingForm.tsx — date + time inputs nativos (step 30min)
+- src/components/shared/CancelBookingButton.tsx — confirmação em dois passos
+- src/app/(dashboard)/dashboard/member/bookings/page.tsx — próximas + histórico
+- src/app/(dashboard)/dashboard/member/bookings/new/page.tsx — só espaços ACTIVE do COWORKING
+- src/app/(dashboard)/dashboard/admin/bookings/page.tsx — todas as reservas com filtros
+
+Regras implementadas:
+- Validação de conflito em transação atômica (BookingError lançado dentro do $transaction)
+- Espaço MAINTENANCE ou INACTIVE bloqueia nova reserva (409)
+- Horário 7h–22h (OUT_OF_HOURS)
+- Duração mínima 30 minutos (TOO_SHORT)
+- Reserva no passado bloqueada (PAST_DATE)
+- Cancelamento até CANCEL_HOURS_BEFORE horas antes (padrão 2h via env)
+- MEMBER só vê e cancela as próprias reservas
+
+### [Fase 6 — Revisão] Reservas exigem aprovação da recepção
+Fluxo revisado após decisão de negócio:
+- MEMBER cria reserva → status PENDING_APPROVAL
+- RECEPTIONIST/ADMIN aprova → CONFIRMED (verifica conflito neste momento)
+- RECEPTIONIST/ADMIN rejeita → REJECTED
+- RECEPTIONIST/ADMIN cria diretamente → CONFIRMED (com verificação de conflito imediata)
+- MEMBER pode cancelar PENDING_APPROVAL ou CONFIRMED (regra das 2h para CONFIRMED)
+
+BookingStatus enum atualizado:
+  PENDING_APPROVAL → CONFIRMED → (via aprovação)
+  PENDING_APPROVAL → REJECTED  → (via rejeição)
+  qualquer → CANCELLED         → (via cancelamento)
+
+Verificação de conflito ocorre na APROVAÇÃO (não na criação pelo MEMBER).
+Isso permite múltiplos pending no mesmo slot — conflito é resolvido na aprovação.
+
+Migration: add_booking_approval_flow
+Novos campos no Booking: approvedById String?, approvedAt DateTime?
+Nova página: /dashboard/reception/bookings — fila de pendentes com ações
+Sidebar da recepção: adicionado link "Reservas"
+Novo componente: BookingActions (aprovar/rejeitar para recepção/admin)
+
+### [Fix] proxy.ts — export const runtime removido
+Next.js 16.2.1 não permite export const runtime em proxy.ts.
+O proxy já roda em Node.js automaticamente — a linha causava erro de build.
+Removida a linha: export const runtime = "nodejs"
+Nota: a decisão anterior de adicionar essa linha foi para Next.js < 16.2.
+A partir do 16.2.1, não é mais necessária nem permitida.
+
+### [Fix] z.coerce.number() incompatível com react-hook-form + Zod v4
+z.coerce.number() em Zod v4 infere o tipo de input como unknown,
+causando conflito com o Resolver do react-hook-form.
+Solução: usar z.number() no schema + { valueAsNumber: true } no register().
+Aplicado em SpaceForm.tsx e TicketServiceOrderForm.tsx.
+
+### [Fix] UserForm.tsx — z.array().default([]) incompatível com react-hook-form
+z.array(z.string()).default([]) cria discrepância entre tipo de input (string[] | undefined)
+e tipo de output (string[]) — causa erro no Resolver.
+Solução: remover .default([]) do schema, usar defaultValues no useForm.
+
+### [Fix] auth.ts — augmentação next-auth/jwt não encontrada
+declare module "next-auth/jwt" falha no NextAuth v5 beta — módulo não encontrado.
+Solução: remover o bloco, adicionar type assertions no callback session:
+  session.user.id      = token.id      as string;
+  session.user.role    = token.role    as Role;
+  session.user.unitIds = token.unitIds as string[];
+
+### [Fix] tsconfig.json — globals do Vitest não reconhecidos pelo TypeScript
+O tsc não reconhecia describe/test/expect dos testes porque faltava a referência.
+Solução: adicionar "types": ["vitest/globals"] no compilerOptions do tsconfig.json.

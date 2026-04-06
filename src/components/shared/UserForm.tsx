@@ -24,7 +24,7 @@ const schema = z.object({
   email:    z.string().email("Email inválido"),
   password: z.string().min(6, "Senha deve ter pelo menos 6 caracteres").optional(),
   role:     z.enum(["ADMIN", "RECEPTIONIST", "MEMBER"] as const),
-  unitIds:  z.array(z.string()).default([]),
+  unitIds:  z.array(z.string()),
 });
 
 type FormData = z.infer<typeof schema>;

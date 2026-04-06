@@ -69,9 +69,10 @@ function getNavSections(role: Role): NavSection[] {
       {
         title: "PRINCIPAL",
         items: [
-          { label: "Painel", href: "/dashboard/reception", icon: LayoutDashboard },
-          { label: "Tickets / SLA", href: "/dashboard/admin/tickets", icon: FileText },
-          { label: "Ordens de Serviço", href: "/dashboard/admin/service-orders", icon: ClipboardList },
+          { label: "Painel",           href: "/dashboard/reception",              icon: LayoutDashboard },
+          { label: "Reservas",         href: "/dashboard/reception/bookings",     icon: Calendar },
+          { label: "Tickets / SLA",    href: "/dashboard/admin/tickets",          icon: FileText },
+          { label: "Ordens de Serviço",href: "/dashboard/admin/service-orders",   icon: ClipboardList },
         ],
       },
       {
