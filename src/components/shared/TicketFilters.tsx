@@ -18,9 +18,10 @@ interface TicketFiltersProps {
 }
 
 const TICKET_STATUSES = [
-  { value: "OPEN",        label: "Aberto" },
-  { value: "IN_PROGRESS", label: "Em andamento" },
-  { value: "CLOSED",      label: "Fechado" },
+  { value: "OPEN",          label: "Aberto" },
+  { value: "IN_PROGRESS",   label: "Em andamento" },
+  { value: "PENDING_CLOSE", label: "Ag. fechamento" },
+  { value: "CLOSED",        label: "Fechado" },
 ];
 
 export function TicketFilters({
@@ -65,7 +66,12 @@ export function TicketFilters({
       {showUnitFilter && (
         <Select value={unitValue} onValueChange={(v) => updateFilter("unitId", v)}>
           <SelectTrigger className="w-56">
-            <SelectValue placeholder="Todas as unidades" />
+            {/* SelectValue não encontra o label sem abrir o dropdown — renderizamos explicitamente */}
+            <SelectValue>
+              {unitValue === "ALL"
+                ? "Todas as unidades"
+                : (units.find((u) => u.id === unitValue)?.name ?? "Todas as unidades")}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent alignItemWithTrigger={false}>
             <SelectItem value="ALL">Todas as unidades</SelectItem>

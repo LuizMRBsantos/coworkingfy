@@ -19,10 +19,6 @@ export default async function AdminDashboardPage() {
   if (session.user.role !== "ADMIN") redirect("/dashboard");
 
   const now = new Date();
-  const todayStart = new Date(now);
-  todayStart.setHours(0, 0, 0, 0);
-  const todayEnd = new Date(now);
-  todayEnd.setHours(23, 59, 59, 999);
 
   const [
     ticketsOpen,
@@ -40,7 +36,7 @@ export default async function AdminDashboardPage() {
     db.serviceOrder.count({
       where: {
         status: { in: ["APPROVED", "IN_PROGRESS"] },
-        slaDeadline: { lt: now },
+        slaResolutionDeadline: { lt: now },
       },
     }),
     db.booking.count({ where: { status: "PENDING_APPROVAL" } }),

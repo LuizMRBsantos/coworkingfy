@@ -21,12 +21,14 @@ import {
 import type { ServiceType, SpaceType } from "@prisma/client";
 
 const schema = z.object({
-  serviceType:   z.enum(["CLEANING", "ELECTRICAL", "HYDRAULIC", "OTHER"] as const),
-  description:   z.string().min(10, "Descrição deve ter pelo menos 10 caracteres"),
-  providerId:    z.string().optional(),
-  spaceId:       z.string().optional(),
-  scheduledDate: z.string().optional(),
-  value:         z.number().positive("Valor deve ser positivo").optional(),
+  serviceType:         z.enum(["CLEANING", "ELECTRICAL", "HYDRAULIC", "OTHER"] as const),
+  description:         z.string().min(10, "Descrição deve ter pelo menos 10 caracteres"),
+  providerId:          z.string().optional(),
+  spaceId:             z.string().optional(),
+  scheduledDate:       z.string().optional(),
+  value:               z.number().positive("Valor deve ser positivo").optional(),
+  isRemote:            z.boolean().optional(),
+  specialInstructions: z.string().optional(),
 });
 
 type FormData = z.infer<typeof schema>;
@@ -78,14 +80,16 @@ export function TicketServiceOrderForm({
     const body = {
       ticketId,
       unitId,
-      serviceType:   data.serviceType,
-      description:   data.description,
-      providerId:    data.providerId || undefined,
-      spaceId:       data.spaceId || undefined,
-      scheduledDate: data.scheduledDate
+      serviceType:         data.serviceType,
+      description:         data.description,
+      providerId:          data.providerId || undefined,
+      spaceId:             data.spaceId || undefined,
+      scheduledDate:       data.scheduledDate
         ? new Date(data.scheduledDate).toISOString()
         : undefined,
-      value: data.value,
+      value:               data.value,
+      isRemote:            data.isRemote ?? false,
+      specialInstructions: data.specialInstructions || undefined,
     };
 
     const res = await fetch("/api/service-orders", {
@@ -240,6 +244,33 @@ export function TicketServiceOrderForm({
             {errors.value && (
               <p className="text-sm text-red-500">{errors.value.message}</p>
             )}
+          </div>
+
+          {/* Instruções especiais */}
+          <div className="space-y-1">
+            <Label htmlFor="specialInstructions">
+              Instruções especiais{" "}
+              <span className="text-gray-400 font-normal">(opcional)</span>
+            </Label>
+            <Textarea
+              id="specialInstructions"
+              placeholder="Atenção, restrições de acesso, EPI necessário..."
+              rows={2}
+              {...register("specialInstructions")}
+            />
+          </div>
+
+          {/* Resolução remota */}
+          <div className="flex items-center gap-3">
+            <input
+              id="isRemote"
+              type="checkbox"
+              className="h-4 w-4 rounded border-gray-300 text-gray-900"
+              {...register("isRemote")}
+            />
+            <Label htmlFor="isRemote" className="cursor-pointer font-normal">
+              Resolução remota (sem visita presencial)
+            </Label>
           </div>
 
           {apiError && <p className="text-sm text-red-500">{apiError}</p>}

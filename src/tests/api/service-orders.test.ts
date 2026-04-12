@@ -12,6 +12,12 @@ vi.mock("@/lib/db", () => ({
       create: vi.fn(),
       update: vi.fn(),
     },
+    ticket: {
+      findUnique: vi.fn(),
+    },
+    serviceOrderChecklistItem: {
+      count: vi.fn(),
+    },
     $transaction: vi.fn(),
   },
 }));
@@ -47,7 +53,8 @@ const mockOS = {
   providerId: null,
   approvedById: null,
   approvedAt: null,
-  slaDeadline: null,
+  slaAttendanceDeadline: null,
+  slaResolutionDeadline: null,
   spaceId: null,
   scheduledDate: null,
   value: null,
@@ -99,6 +106,7 @@ describe("GET /api/service-orders", () => {
   test("RECEPTIONIST recebe só OS da sua unidade", async () => {
     vi.mocked(auth).mockResolvedValue(receptionistSession as never);
     vi.mocked(db.serviceOrder.findMany).mockResolvedValue([mockOS] as never);
+    vi.mocked(db.serviceOrder.count).mockResolvedValue(1 as never);
 
     const res = await GET(makeGetRequest());
     expect(res.status).toBe(200);
@@ -111,6 +119,7 @@ describe("GET /api/service-orders", () => {
   test("ADMIN recebe todas as OS sem filtro de unidade", async () => {
     vi.mocked(auth).mockResolvedValue(adminSession as never);
     vi.mocked(db.serviceOrder.findMany).mockResolvedValue([mockOS] as never);
+    vi.mocked(db.serviceOrder.count).mockResolvedValue(1 as never);
 
     const res = await GET(makeGetRequest());
     expect(res.status).toBe(200);
@@ -123,6 +132,7 @@ describe("GET /api/service-orders", () => {
   test("ADMIN pode filtrar por unidade via query param", async () => {
     vi.mocked(auth).mockResolvedValue(adminSession as never);
     vi.mocked(db.serviceOrder.findMany).mockResolvedValue([mockOS] as never);
+    vi.mocked(db.serviceOrder.count).mockResolvedValue(1 as never);
 
     const res = await GET(makeGetRequest("http://localhost/api/service-orders?unitId=unit-1"));
     expect(res.status).toBe(200);
@@ -162,6 +172,7 @@ describe("POST /api/service-orders", () => {
 
   test("RECEPTIONIST cria OS com status DRAFT", async () => {
     vi.mocked(auth).mockResolvedValue(receptionistSession as never);
+    vi.mocked(db.ticket.findUnique).mockResolvedValue({ id: "ticket-1", status: "OPEN" } as never);
     vi.mocked(db.$transaction).mockImplementation(async (fn: Parameters<typeof db.$transaction>[0]) => {
       const mockTx = {
         serviceOrder: {
@@ -203,46 +214,72 @@ describe("PUT /api/service-orders/[id]", () => {
     expect(res.status).toBe(403);
   });
 
-  test("ADMIN pode fazer APPROVED — slaDeadline calculado", async () => {
+  test("ADMIN pode fazer APPROVED — slaDeadlines calculados", async () => {
     vi.mocked(auth).mockResolvedValue(adminSession as never);
     vi.mocked(db.serviceOrder.findUnique).mockResolvedValue({
       ...mockOS,
       status: "PENDING_APPROVAL",
     } as never);
-    vi.mocked(db.serviceOrder.update).mockResolvedValue({
+
+    const approvedOS = {
       ...mockOS,
       status: "APPROVED",
       approvedById: "admin-id",
       approvedAt: new Date(),
-      slaDeadline: new Date(Date.now() + 48 * 60 * 60 * 1000), // HIGH = 48h
-    } as never);
+      slaAttendanceDeadline: new Date(Date.now() + 8 * 60 * 60 * 1000),
+      slaResolutionDeadline: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      provider: null,
+      space: null,
+      asset: null,
+      approvedBy: { id: "admin-id", name: "Admin" },
+      checklists: [],
+      attachments: [],
+    };
+    const txUpdateMock = vi.fn().mockResolvedValue(approvedOS);
+    vi.mocked(db.$transaction).mockImplementation(async (fn) => fn({
+      serviceOrder:  { update: txUpdateMock },
+      activityLog:   { create: vi.fn().mockResolvedValue({}) },
+      providerToken: { upsert: vi.fn().mockResolvedValue({ token: "tok-123" }) },
+    } as never));
 
     const res = await PUT(makePutRequest({ status: "APPROVED" }), { params: idParams });
     expect(res.status).toBe(200);
     const json = await res.json();
     expect(json.status).toBe("APPROVED");
-    expect(json.slaDeadline).toBeTruthy();
+    expect(json.slaAttendanceDeadline).toBeTruthy();
+    expect(json.slaResolutionDeadline).toBeTruthy();
 
-    expect(db.serviceOrder.update).toHaveBeenCalledWith(
+    expect(txUpdateMock).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          approvedById: "admin-id",
-          approvedAt: expect.any(Date),
-          slaDeadline: expect.any(Date),
+          approvedById:          "admin-id",
+          approvedAt:            expect.any(Date),
+          slaAttendanceDeadline: expect.any(Date),
+          slaResolutionDeadline: expect.any(Date),
         }),
       })
     );
   });
 
-  test("CANCELLED funciona a partir de DRAFT", async () => {
+  test("CANCELLED sem motivo retorna 400", async () => {
     vi.mocked(auth).mockResolvedValue(receptionistSession as never);
     vi.mocked(db.serviceOrder.findUnique).mockResolvedValue(mockOS as never); // DRAFT
-    vi.mocked(db.serviceOrder.update).mockResolvedValue({
-      ...mockOS,
-      status: "CANCELLED",
-    } as never);
 
     const res = await PUT(makePutRequest({ status: "CANCELLED" }), { params: idParams });
+    expect(res.status).toBe(400);
+  });
+
+  test("CANCELLED funciona a partir de DRAFT com motivo", async () => {
+    vi.mocked(auth).mockResolvedValue(receptionistSession as never);
+    vi.mocked(db.serviceOrder.findUnique).mockResolvedValue(mockOS as never); // DRAFT
+    const cancelledOS = { ...mockOS, status: "CANCELLED", provider: null, space: null, asset: null, approvedBy: null, checklists: [], attachments: [] };
+    vi.mocked(db.$transaction).mockImplementation(async (fn) => fn({
+      serviceOrder:  { update: vi.fn().mockResolvedValue(cancelledOS) },
+      activityLog:   { create: vi.fn().mockResolvedValue({}) },
+      providerToken: { upsert: vi.fn().mockResolvedValue({ token: "tok" }) },
+    } as never));
+
+    const res = await PUT(makePutRequest({ status: "CANCELLED", cancellationReason: "Serviço não necessário" }), { params: idParams });
     expect(res.status).toBe(200);
     const json = await res.json();
     expect(json.status).toBe("CANCELLED");
@@ -250,16 +287,15 @@ describe("PUT /api/service-orders/[id]", () => {
 
   test("CANCELLED funciona a partir de IN_PROGRESS", async () => {
     vi.mocked(auth).mockResolvedValue(adminSession as never);
-    vi.mocked(db.serviceOrder.findUnique).mockResolvedValue({
-      ...mockOS,
-      status: "IN_PROGRESS",
-    } as never);
-    vi.mocked(db.serviceOrder.update).mockResolvedValue({
-      ...mockOS,
-      status: "CANCELLED",
-    } as never);
+    vi.mocked(db.serviceOrder.findUnique).mockResolvedValue({ ...mockOS, status: "IN_PROGRESS" } as never);
+    const cancelledOS = { ...mockOS, status: "CANCELLED", provider: null, space: null, asset: null, approvedBy: null, checklists: [], attachments: [] };
+    vi.mocked(db.$transaction).mockImplementation(async (fn) => fn({
+      serviceOrder:  { update: vi.fn().mockResolvedValue(cancelledOS) },
+      activityLog:   { create: vi.fn().mockResolvedValue({}) },
+      providerToken: { upsert: vi.fn().mockResolvedValue({ token: "tok" }) },
+    } as never));
 
-    const res = await PUT(makePutRequest({ status: "CANCELLED" }), { params: idParams });
+    const res = await PUT(makePutRequest({ status: "CANCELLED", cancellationReason: "Problema resolvido de outra forma" }), { params: idParams });
     expect(res.status).toBe(200);
   });
 });

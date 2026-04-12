@@ -29,5 +29,13 @@ jobs:
       - name: Checar formatação e lint
         run: npm run lint
 
-      - name: Rodar testes
-        run: npm test
+      - name: Rodar testes com cobertura
+        run: npm run test:coverage
+
+      - name: Verificar build
+        run: npm run build
+        env:
+          AUTH_SECRET: "ci-secret-placeholder"
+          AUTH_URL: "http://localhost:3000"
+          DATABASE_URL: "postgresql://placeholder:placeholder@localhost:5432/placeholder"
+          CANCEL_HOURS_BEFORE: "2"

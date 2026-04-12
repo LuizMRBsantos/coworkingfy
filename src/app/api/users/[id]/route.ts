@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
-import { db } from "@/lib/db";
-import { Role } from "@prisma/client";
 import { z } from "zod";
+import { Role } from "@prisma/client";
+import { db } from "@/lib/db";
+import { withAuth } from "@/lib/rbac";
 
 const UpdateUserSchema = z.object({
   name:    z.string().min(1).optional(),
@@ -17,84 +17,86 @@ const userSelect = {
   userUnits: { select: { unit: { select: { id: true, name: true } } } },
 } as const;
 
-export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const session = await auth();
-  if (!session) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
-  if (session.user.role !== "ADMIN") return NextResponse.json({ error: "Sem permissão" }, { status: 403 });
-
-  const { id } = await params;
-  const user = await db.user.findUnique({ where: { id }, select: userSelect });
-  if (!user) return NextResponse.json({ error: "Usuário não encontrado" }, { status: 404 });
-  return NextResponse.json(user);
+interface RouteContext {
+  params: Promise<{ id: string }>;
 }
 
-export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const session = await auth();
-  if (!session) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
-  if (session.user.role !== "ADMIN") return NextResponse.json({ error: "Sem permissão" }, { status: 403 });
+export const GET = withAuth(
+  async (_req, _session, { params }: RouteContext) => {
+    const { id } = await params;
+    const user   = await db.user.findUnique({ where: { id }, select: userSelect });
+    if (!user) return NextResponse.json({ error: "Usuário não encontrado" }, { status: 404 });
+    return NextResponse.json(user);
+  },
+  ["ADMIN"],
+);
 
-  const { id } = await params;
-  const user = await db.user.findUnique({ where: { id } });
-  if (!user) return NextResponse.json({ error: "Usuário não encontrado" }, { status: 404 });
+export const PUT = withAuth(
+  async (req, _session, { params }: RouteContext) => {
+    const { id } = await params;
 
-  const body = await req.json();
-  const parsed = UpdateUserSchema.safeParse(body);
-  if (!parsed.success) {
-    return NextResponse.json({ error: "Dados inválidos", code: "VALIDATION_ERROR" }, { status: 400 });
-  }
+    const user = await db.user.findUnique({ where: { id } });
+    if (!user) return NextResponse.json({ error: "Usuário não encontrado" }, { status: 404 });
 
-  const { name, email, role, unitIds, active } = parsed.data;
-
-  if (email && email !== user.email) {
-    const existing = await db.user.findUnique({ where: { email } });
-    if (existing) {
-      return NextResponse.json({ error: "Email já cadastrado", code: "EMAIL_EXISTS" }, { status: 409 });
+    const body   = await req.json();
+    const parsed = UpdateUserSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: "Dados inválidos", code: "VALIDATION_ERROR" }, { status: 400 });
     }
-  }
 
-  const updated = await db.user.update({
-    where: { id },
-    data: {
-      ...(name   !== undefined ? { name }   : {}),
-      ...(email  !== undefined ? { email }  : {}),
-      ...(role   !== undefined ? { role }   : {}),
-      ...(active !== undefined ? { active } : {}),
-      ...(unitIds !== undefined ? {
-        userUnits: { deleteMany: {}, create: unitIds.map((unitId) => ({ unitId })) },
-      } : {}),
-    },
-    select: userSelect,
-  });
+    const { name, email, role, unitIds, active } = parsed.data;
 
-  return NextResponse.json(updated);
-}
+    if (email && email !== user.email) {
+      const existing = await db.user.findUnique({ where: { email } });
+      if (existing) {
+        return NextResponse.json({ error: "Email já cadastrado", code: "EMAIL_EXISTS" }, { status: 409 });
+      }
+    }
 
-export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const session = await auth();
-  if (!session) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
-  if (session.user.role !== "ADMIN") return NextResponse.json({ error: "Sem permissão" }, { status: 403 });
+    const updated = await db.user.update({
+      where: { id },
+      data: {
+        ...(name   !== undefined ? { name }   : {}),
+        ...(email  !== undefined ? { email }  : {}),
+        ...(role   !== undefined ? { role }   : {}),
+        ...(active !== undefined ? { active } : {}),
+        ...(unitIds !== undefined ? {
+          userUnits: { deleteMany: {}, create: unitIds.map((unitId) => ({ unitId })) },
+        } : {}),
+      },
+      select: userSelect,
+    });
 
-  const { id } = await params;
+    return NextResponse.json(updated);
+  },
+  ["ADMIN"],
+);
 
-  if (id === session.user.id) {
-    return NextResponse.json({ error: "Não é possível desativar sua própria conta" }, { status: 400 });
-  }
+export const DELETE = withAuth(
+  async (_req, session, { params }: RouteContext) => {
+    const { id } = await params;
 
-  const user = await db.user.findUnique({ where: { id } });
-  if (!user) return NextResponse.json({ error: "Usuário não encontrado" }, { status: 404 });
+    if (id === session.user.id) {
+      return NextResponse.json({ error: "Não é possível desativar sua própria conta" }, { status: 400 });
+    }
 
-  const [ticketCount, osCount] = await Promise.all([
-    db.ticket.count({ where: { createdById: id } }),
-    db.serviceOrder.count({ where: { createdById: id } }),
-  ]);
+    const user = await db.user.findUnique({ where: { id } });
+    if (!user) return NextResponse.json({ error: "Usuário não encontrado" }, { status: 404 });
 
-  if (ticketCount > 0 || osCount > 0) {
-    return NextResponse.json(
-      { error: "Não é possível apagar usuário com registros vinculados (tickets ou ordens de serviço)" },
-      { status: 400 }
-    );
-  }
+    const [ticketCount, osCount] = await Promise.all([
+      db.ticket.count({ where: { createdById: id } }),
+      db.serviceOrder.count({ where: { createdById: id } }),
+    ]);
 
-  await db.user.delete({ where: { id } });
-  return NextResponse.json({ message: "Usuário apagado com sucesso" });
-}
+    if (ticketCount > 0 || osCount > 0) {
+      return NextResponse.json(
+        { error: "Não é possível apagar usuário com registros vinculados (tickets ou ordens de serviço)" },
+        { status: 400 },
+      );
+    }
+
+    await db.user.delete({ where: { id } });
+    return NextResponse.json({ message: "Usuário apagado com sucesso" });
+  },
+  ["ADMIN"],
+);

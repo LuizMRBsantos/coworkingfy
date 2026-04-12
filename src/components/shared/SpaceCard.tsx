@@ -17,15 +17,15 @@ const STATUS_LABEL: Record<SpaceStatus, string> = {
 };
 
 const STATUS_CLASS: Record<SpaceStatus, string> = {
-  ACTIVE:      "bg-green-100 text-green-700 hover:bg-green-100",
-  MAINTENANCE: "bg-yellow-100 text-yellow-700 hover:bg-yellow-100",
-  INACTIVE:    "bg-red-100 text-red-700 hover:bg-red-100",
+  ACTIVE:      "bg-emerald-100 text-emerald-700 hover:bg-emerald-200 border-none",
+  MAINTENANCE: "bg-amber-100 text-amber-700 hover:bg-amber-200 border-none",
+  INACTIVE:    "bg-rose-100 text-rose-700 hover:bg-rose-200 border-none",
 };
 
 const TYPE_CLASS: Record<SpaceType, string> = {
-  MEETING_ROOM:   "bg-blue-100 text-blue-700 hover:bg-blue-100",
-  PRIVATE_OFFICE: "bg-purple-100 text-purple-700 hover:bg-purple-100",
-  WORKSTATION:    "bg-gray-100 text-gray-600 hover:bg-gray-100",
+  MEETING_ROOM:   "bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100",
+  PRIVATE_OFFICE: "bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100",
+  WORKSTATION:    "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100",
 };
 
 interface SpaceCardProps {
@@ -45,14 +45,14 @@ interface SpaceCardProps {
 export function SpaceCard({ space, href }: SpaceCardProps) {
   return (
     <Link href={href} className="block">
-      <Card className="hover:border-gray-300 transition-colors cursor-pointer">
-        <CardContent className="p-4">
+      <Card className="hover:border-gray-300 transition-colors cursor-pointer shadow-sm border-gray-200">
+        <CardContent className="p-5">
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-medium text-gray-900">{space.name}</span>
-                <Badge className={TYPE_CLASS[space.type]}>{TYPE_LABEL[space.type]}</Badge>
-                <Badge className={STATUS_CLASS[space.status]}>{STATUS_LABEL[space.status]}</Badge>
+                <span className="font-semibold text-gray-900">{space.name}</span>
+                <Badge variant="outline" className={`font-medium ${TYPE_CLASS[space.type]}`}>{TYPE_LABEL[space.type]}</Badge>
+                <Badge className={`font-medium rounded-full ${STATUS_CLASS[space.status]}`}>{STATUS_LABEL[space.status]}</Badge>
               </div>
 
               {space.description && (

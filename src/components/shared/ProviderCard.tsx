@@ -17,13 +17,13 @@ const TYPE_LABEL: Record<ProviderType, string> = {
 };
 
 const TYPE_CLASS: Record<ProviderType, string> = {
-  RECURRING: "bg-blue-100 text-blue-700 hover:bg-blue-100",
-  PUNCTUAL:  "bg-orange-100 text-orange-700 hover:bg-orange-100",
+  RECURRING: "bg-blue-100 text-blue-700 hover:bg-blue-200 border-none",
+  PUNCTUAL:  "bg-orange-100 text-orange-700 hover:bg-orange-200 border-none",
 };
 
 const STATUS_CLASS: Record<ProviderStatus, string> = {
-  ACTIVE:   "bg-green-100 text-green-700 hover:bg-green-100",
-  INACTIVE: "bg-red-100 text-red-700 hover:bg-red-100",
+  ACTIVE:   "bg-emerald-100 text-emerald-700 hover:bg-emerald-200 border-none",
+  INACTIVE: "bg-rose-100 text-rose-700 hover:bg-rose-200 border-none",
 };
 
 interface ProviderCardProps {
@@ -44,15 +44,15 @@ interface ProviderCardProps {
 export function ProviderCard({ provider, href }: ProviderCardProps) {
   return (
     <Link href={href} className="block">
-      <Card className="hover:border-gray-300 transition-colors cursor-pointer">
-        <CardContent className="p-4">
+      <Card className="hover:border-gray-300 transition-colors cursor-pointer shadow-sm border-gray-200">
+        <CardContent className="p-5">
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-medium text-gray-900">{provider.name}</span>
-                <Badge className={TYPE_CLASS[provider.type]}>{TYPE_LABEL[provider.type]}</Badge>
-                <Badge variant="outline">{SPECIALTY_LABEL[provider.specialty]}</Badge>
-                <Badge className={STATUS_CLASS[provider.status]}>
+                <span className="font-semibold text-gray-900">{provider.name}</span>
+                <Badge className={`font-medium rounded-full ${TYPE_CLASS[provider.type]}`}>{TYPE_LABEL[provider.type]}</Badge>
+                <Badge variant="outline" className="font-medium bg-transparent border-gray-200 text-gray-600 hover:bg-gray-50">{SPECIALTY_LABEL[provider.specialty]}</Badge>
+                <Badge className={`font-medium rounded-full ${STATUS_CLASS[provider.status]}`}>
                   {provider.status === "ACTIVE" ? "Ativo" : "Inativo"}
                 </Badge>
               </div>

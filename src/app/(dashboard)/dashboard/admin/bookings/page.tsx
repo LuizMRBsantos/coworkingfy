@@ -5,12 +5,12 @@ import { db } from "@/lib/db";
 import { BookingCard } from "@/components/shared/BookingCard";
 import { BookingActions } from "@/components/shared/BookingActions";
 import { CancelBookingButton } from "@/components/shared/CancelBookingButton";
+import { Pagination } from "@/components/shared/Pagination";
+import { PAGE_SIZE, CANCEL_HOURS_BEFORE } from "@/lib/constants";
 import type { BookingStatus } from "@prisma/client";
 
-const CANCEL_HOURS_BEFORE = Number(process.env.CANCEL_HOURS_BEFORE ?? 2);
-
 interface PageProps {
-  searchParams: Promise<{ status?: string; unitId?: string; date?: string }>;
+  searchParams: Promise<{ status?: string; unitId?: string; date?: string; page?: string }>;
 }
 
 export default async function AdminBookingsPage({ searchParams }: PageProps) {
@@ -18,21 +18,27 @@ export default async function AdminBookingsPage({ searchParams }: PageProps) {
   if (!session) redirect("/login");
   if (session.user.role !== "ADMIN") redirect("/dashboard");
 
-  const { status, unitId, date } = await searchParams;
+  const { status, unitId, date, page: pageParam } = await searchParams;
 
   const dateFilter = date ? new Date(date) : undefined;
   const nextDay    = dateFilter ? new Date(new Date(date!).getTime() + 86400000) : undefined;
+  const page       = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
+  const skip       = (page - 1) * PAGE_SIZE;
 
-  const [bookings, units] = await Promise.all([
+  const where = {
+    ...(status  ? { status:    status as BookingStatus } : {}),
+    ...(unitId  ? { space: { unitId } }                  : {}),
+    ...(dateFilter && nextDay
+      ? { startTime: { gte: dateFilter, lt: nextDay } }
+      : {}),
+  };
+
+  const [bookings, total, units] = await Promise.all([
     db.booking.findMany({
-      where: {
-        ...(status  ? { status:    status as BookingStatus }   : {}),
-        ...(unitId  ? { space: { unitId } }                     : {}),
-        ...(dateFilter && nextDay
-          ? { startTime: { gte: dateFilter, lt: nextDay } }
-          : {}),
-      },
+      where,
       orderBy: { startTime: "desc" },
+      skip,
+      take: PAGE_SIZE,
       include: {
         space: {
           select: {
@@ -43,8 +49,15 @@ export default async function AdminBookingsPage({ searchParams }: PageProps) {
         user: { select: { id: true, name: true, email: true } },
       },
     }),
+    db.booking.count({ where }),
     db.unit.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
   ]);
+
+  const totalPages = Math.ceil(total / PAGE_SIZE);
+  const sp: Record<string, string> = {};
+  if (status) sp.status = status;
+  if (unitId) sp.unitId = unitId;
+  if (date)   sp.date   = date;
 
   const now = new Date();
 
@@ -59,7 +72,7 @@ export default async function AdminBookingsPage({ searchParams }: PageProps) {
       <div>
         <h1 className="text-2xl font-semibold text-gray-900">Reservas</h1>
         <p className="text-sm text-gray-500 mt-1">
-          {bookings.length} reserva{bookings.length !== 1 ? "s" : ""} encontrada{bookings.length !== 1 ? "s" : ""}
+          {total} reserva{total !== 1 ? "s" : ""} encontrada{total !== 1 ? "s" : ""}
         </p>
       </div>
 
@@ -112,6 +125,8 @@ export default async function AdminBookingsPage({ searchParams }: PageProps) {
           ))
         )}
       </div>
+
+      <Pagination page={page} totalPages={totalPages} searchParams={sp} />
     </div>
   );
 }

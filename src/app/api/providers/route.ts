@@ -1,33 +1,33 @@
-import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
-import { db } from "@/lib/db";
-import { ServiceType, ProviderType, ProviderStatus } from "@prisma/client";
+import { NextResponse } from "next/server";
 import { z } from "zod";
+import { ServiceType, ProviderType, ProviderStatus } from "@prisma/client";
+import { db } from "@/lib/db";
+import { withAuth } from "@/lib/rbac";
+import { CreateProviderSchema } from "@/lib/validations/provider";
 
-const CreateProviderSchema = z.object({
-  unitId:    z.string().min(1),
-  name:      z.string().min(1, "Nome é obrigatório"),
-  specialty: z.nativeEnum(ServiceType),
-  type:      z.nativeEnum(ProviderType),
-  phone:     z.string().optional(),
-  email:     z.string().email("Email inválido").optional().or(z.literal("")),
-});
+const TypeSchema      = z.nativeEnum(ProviderType).optional();
+const SpecialtySchema = z.nativeEnum(ServiceType).optional();
+const StatusSchema    = z.nativeEnum(ProviderStatus).optional();
 
-export async function GET(req: NextRequest) {
-  const session = await auth();
-  if (!session) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
+export const GET = withAuth(
+  async (req, session) => {
+    const { role, unitIds } = session.user;
+    const params = req.nextUrl.searchParams;
 
-  const { role, unitIds } = session.user;
-  if (role === "MEMBER") return NextResponse.json({ error: "Sem permissão" }, { status: 403 });
+    const unitFilter = role === "ADMIN" ? params.get("unitId") ?? undefined : undefined;
 
-  const params = req.nextUrl.searchParams;
-  const unitFilter     = role === "ADMIN" ? params.get("unitId") ?? undefined : undefined;
-  const typeParam      = params.get("type") as ProviderType | null;
-  const specialtyParam = params.get("specialty") as ServiceType | null;
-  const statusParam    = params.get("status") as ProviderStatus | null;
+    const typeParsed      = TypeSchema.safeParse(params.get("type") ?? undefined);
+    const specialtyParsed = SpecialtySchema.safeParse(params.get("specialty") ?? undefined);
+    const statusParsed    = StatusSchema.safeParse(params.get("status") ?? undefined);
+    const typeParam       = typeParsed.success      ? typeParsed.data      : undefined;
+    const specialtyParam  = specialtyParsed.success ? specialtyParsed.data : undefined;
+    const statusParam     = statusParsed.success    ? statusParsed.data    : undefined;
 
-  const providers = await db.provider.findMany({
-    where: {
+    const page  = Math.max(1, parseInt(params.get("page")  ?? "1",  10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(params.get("limit") ?? "20", 10) || 20));
+    const skip  = (page - 1) * limit;
+
+    const where = {
       ...(unitFilter
         ? { unitId: unitFilter }
         : role === "RECEPTIONIST"
@@ -36,48 +36,57 @@ export async function GET(req: NextRequest) {
       ...(typeParam      ? { type:      typeParam }      : {}),
       ...(specialtyParam ? { specialty: specialtyParam } : {}),
       ...(statusParam    ? { status:    statusParam }    : {}),
-    },
-    orderBy: [{ name: "asc" }],
-    include: {
-      unit:   { select: { id: true, name: true } },
-      _count: { select: { serviceOrders: true } },
-    },
-  });
+    };
 
-  return NextResponse.json(providers);
-}
+    const [providers, total] = await Promise.all([
+      db.provider.findMany({
+        where,
+        orderBy: [{ name: "asc" }],
+        skip,
+        take: limit,
+        include: {
+          unit:   { select: { id: true, name: true } },
+          _count: { select: { serviceOrders: true } },
+        },
+      }),
+      db.provider.count({ where }),
+    ]);
 
-export async function POST(req: Request) {
-  const session = await auth();
-  if (!session) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
+    return NextResponse.json({ data: providers, meta: { total, page, limit, totalPages: Math.ceil(total / limit) } });
+  },
+  ["ADMIN", "RECEPTIONIST"],
+);
 
-  const { role, unitIds } = session.user;
-  if (role === "MEMBER") return NextResponse.json({ error: "Sem permissão" }, { status: 403 });
+export const POST = withAuth(
+  async (req, session) => {
+    const { role, unitIds } = session.user;
 
-  const body = await req.json();
-  const parsed = CreateProviderSchema.safeParse(body);
-  if (!parsed.success) {
-    return NextResponse.json({ error: "Dados inválidos", code: "VALIDATION_ERROR" }, { status: 400 });
-  }
+    const body   = await req.json();
+    const parsed = CreateProviderSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: "Dados inválidos", code: "VALIDATION_ERROR" }, { status: 400 });
+    }
 
-  const { unitId, name, specialty, type, phone, email } = parsed.data;
+    const { unitId, name, specialty, type, phone, email } = parsed.data;
 
-  // RECEPTIONIST só cria prestadores na sua unidade
-  if (role === "RECEPTIONIST" && !unitIds.includes(unitId)) {
-    return NextResponse.json({ error: "Sem permissão para esta unidade" }, { status: 403 });
-  }
+    // RECEPTIONIST só cria prestadores na sua unidade
+    if (role === "RECEPTIONIST" && !unitIds.includes(unitId)) {
+      return NextResponse.json({ error: "Sem permissão para esta unidade" }, { status: 403 });
+    }
 
-  const provider = await db.provider.create({
-    data: {
-      unitId,
-      name,
-      specialty,
-      type,
-      phone: phone ?? null,
-      email: email || null,
-    },
-    include: { unit: { select: { id: true, name: true } } },
-  });
+    const provider = await db.provider.create({
+      data: {
+        unitId,
+        name,
+        specialty,
+        type,
+        phone: phone ?? null,
+        email: email || null,
+      },
+      include: { unit: { select: { id: true, name: true } } },
+    });
 
-  return NextResponse.json(provider, { status: 201 });
-}
+    return NextResponse.json(provider, { status: 201 });
+  },
+  ["ADMIN", "RECEPTIONIST"],
+);

@@ -4,11 +4,13 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { Button } from "@/components/ui/button";
 import { SpaceCard } from "@/components/shared/SpaceCard";
+import { Pagination } from "@/components/shared/Pagination";
+import { PAGE_SIZE } from "@/lib/constants";
 import { Plus } from "lucide-react";
 import type { SpaceType, SpaceStatus } from "@prisma/client";
 
 interface PageProps {
-  searchParams: Promise<{ type?: string; status?: string }>;
+  searchParams: Promise<{ type?: string; status?: string; page?: string }>;
 }
 
 export default async function SpacesPage({ searchParams }: PageProps) {
@@ -16,22 +18,35 @@ export default async function SpacesPage({ searchParams }: PageProps) {
   if (!session) redirect("/login");
   if (session.user.role !== "ADMIN") redirect("/dashboard");
 
-  const { type, status } = await searchParams;
+  const { type, status, page: pageParam } = await searchParams;
 
-  const [spaces, coworkingUnit] = await Promise.all([
+  const page = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
+  const skip = (page - 1) * PAGE_SIZE;
+
+  const where = {
+    ...(type   ? { type:   type   as SpaceType }   : {}),
+    ...(status ? { status: status as SpaceStatus } : {}),
+  };
+
+  const [spaces, total, coworkingUnit] = await Promise.all([
     db.space.findMany({
-      where: {
-        ...(type   ? { type:   type   as SpaceType }   : {}),
-        ...(status ? { status: status as SpaceStatus } : {}),
-      },
+      where,
       orderBy: [{ type: "asc" }, { name: "asc" }],
+      skip,
+      take: PAGE_SIZE,
       include: {
         unit:   { select: { id: true, name: true } },
         _count: { select: { bookings: true, serviceOrders: true } },
       },
     }),
+    db.space.count({ where }),
     db.unit.findFirst({ where: { type: "COWORKING" }, select: { id: true, name: true } }),
   ]);
+
+  const totalPages = Math.ceil(total / PAGE_SIZE);
+  const sp: Record<string, string> = {};
+  if (type)   sp.type   = type;
+  if (status) sp.status = status;
 
   return (
     <div className="space-y-6">
@@ -39,7 +54,7 @@ export default async function SpacesPage({ searchParams }: PageProps) {
         <div>
           <h1 className="text-2xl font-semibold text-gray-900">Espaços</h1>
           <p className="text-sm text-gray-500 mt-1">
-            {spaces.length} espaço{spaces.length !== 1 ? "s" : ""} cadastrado{spaces.length !== 1 ? "s" : ""}
+            {total} espaço{total !== 1 ? "s" : ""} cadastrado{total !== 1 ? "s" : ""}
             {coworkingUnit && <span className="ml-1">— {coworkingUnit.name}</span>}
           </p>
         </div>
@@ -51,7 +66,7 @@ export default async function SpacesPage({ searchParams }: PageProps) {
         </Link>
       </div>
 
-      {/* Filtros simples */}
+      {/* Filtros */}
       <div className="flex gap-2 flex-wrap text-sm">
         <Link
           href="/dashboard/admin/spaces"
@@ -95,6 +110,8 @@ export default async function SpacesPage({ searchParams }: PageProps) {
           ))
         )}
       </div>
+
+      <Pagination page={page} totalPages={totalPages} searchParams={sp} />
     </div>
   );
 }

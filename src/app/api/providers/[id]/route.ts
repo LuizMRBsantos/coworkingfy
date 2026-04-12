@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
-import { db } from "@/lib/db";
-import { ServiceType, ProviderType, ProviderStatus } from "@prisma/client";
 import { z } from "zod";
+import { ServiceType, ProviderType, ProviderStatus } from "@prisma/client";
+import { db } from "@/lib/db";
+import { withAuth } from "@/lib/rbac";
 
 const UpdateProviderSchema = z.object({
   name:      z.string().min(1).optional(),
@@ -13,68 +13,64 @@ const UpdateProviderSchema = z.object({
   status:    z.nativeEnum(ProviderStatus).optional(),
 });
 
-interface RouteParams {
+interface RouteContext {
   params: Promise<{ id: string }>;
 }
 
-export async function GET(_req: Request, { params }: RouteParams) {
-  const session = await auth();
-  if (!session) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
+export const GET = withAuth(
+  async (_req, session, { params }: RouteContext) => {
+    const { role, unitIds } = session.user;
+    const { id } = await params;
 
-  const { role, unitIds } = session.user;
-  if (role === "MEMBER") return NextResponse.json({ error: "Sem permissão" }, { status: 403 });
+    const provider = await db.provider.findUnique({
+      where: { id },
+      include: {
+        unit:   { select: { id: true, name: true } },
+        _count: { select: { serviceOrders: true } },
+      },
+    });
 
-  const { id } = await params;
+    if (!provider) return NextResponse.json({ error: "Prestador não encontrado" }, { status: 404 });
 
-  const provider = await db.provider.findUnique({
-    where: { id },
-    include: {
-      unit:   { select: { id: true, name: true } },
-      _count: { select: { serviceOrders: true } },
-    },
-  });
+    if (role === "RECEPTIONIST" && !unitIds.includes(provider.unitId)) {
+      return NextResponse.json({ error: "Sem permissão" }, { status: 403 });
+    }
 
-  if (!provider) return NextResponse.json({ error: "Prestador não encontrado" }, { status: 404 });
+    return NextResponse.json(provider);
+  },
+  ["ADMIN", "RECEPTIONIST"],
+);
 
-  if (role === "RECEPTIONIST" && !unitIds.includes(provider.unitId)) {
-    return NextResponse.json({ error: "Sem permissão" }, { status: 403 });
-  }
+export const PUT = withAuth(
+  async (req, session, { params }: RouteContext) => {
+    const { role, unitIds } = session.user;
+    const { id } = await params;
 
-  return NextResponse.json(provider);
-}
+    const body   = await req.json();
+    const parsed = UpdateProviderSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: "Dados inválidos", code: "VALIDATION_ERROR" }, { status: 400 });
+    }
 
-export async function PUT(req: Request, { params }: RouteParams) {
-  const session = await auth();
-  if (!session) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
+    const existing = await db.provider.findUnique({ where: { id } });
+    if (!existing) return NextResponse.json({ error: "Prestador não encontrado" }, { status: 404 });
 
-  const { role, unitIds } = session.user;
-  if (role === "MEMBER") return NextResponse.json({ error: "Sem permissão" }, { status: 403 });
+    if (role === "RECEPTIONIST" && !unitIds.includes(existing.unitId)) {
+      return NextResponse.json({ error: "Sem permissão para esta unidade" }, { status: 403 });
+    }
 
-  const { id } = await params;
+    const data = {
+      ...parsed.data,
+      email: parsed.data.email === "" ? null : parsed.data.email,
+    };
 
-  const body = await req.json();
-  const parsed = UpdateProviderSchema.safeParse(body);
-  if (!parsed.success) {
-    return NextResponse.json({ error: "Dados inválidos", code: "VALIDATION_ERROR" }, { status: 400 });
-  }
+    const provider = await db.provider.update({
+      where: { id },
+      data,
+      include: { unit: { select: { id: true, name: true } } },
+    });
 
-  const existing = await db.provider.findUnique({ where: { id } });
-  if (!existing) return NextResponse.json({ error: "Prestador não encontrado" }, { status: 404 });
-
-  if (role === "RECEPTIONIST" && !unitIds.includes(existing.unitId)) {
-    return NextResponse.json({ error: "Sem permissão para esta unidade" }, { status: 403 });
-  }
-
-  const data = {
-    ...parsed.data,
-    email: parsed.data.email === "" ? null : parsed.data.email,
-  };
-
-  const provider = await db.provider.update({
-    where: { id },
-    data,
-    include: { unit: { select: { id: true, name: true } } },
-  });
-
-  return NextResponse.json(provider);
-}
+    return NextResponse.json(provider);
+  },
+  ["ADMIN", "RECEPTIONIST"],
+);

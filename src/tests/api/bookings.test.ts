@@ -8,6 +8,7 @@ vi.mock("@/lib/db", () => ({
       findMany:  vi.fn(),
       findUnique: vi.fn(),
       findFirst: vi.fn(),
+      count:     vi.fn(),
       create:    vi.fn(),
       update:    vi.fn(),
     },
@@ -117,6 +118,7 @@ describe("GET /api/bookings", () => {
   test("MEMBER recebe só as próprias reservas", async () => {
     vi.mocked(auth).mockResolvedValue(memberSession as never);
     vi.mocked(db.booking.findMany).mockResolvedValue([mockBookingPending] as never);
+    vi.mocked(db.booking.count).mockResolvedValue(1 as never);
 
     const res = await GET(new NextRequest("http://localhost/api/bookings"));
     expect(res.status).toBe(200);
@@ -128,6 +130,7 @@ describe("GET /api/bookings", () => {
   test("RECEPTIONIST filtra por unitId da sua unidade", async () => {
     vi.mocked(auth).mockResolvedValue(receptionistSession as never);
     vi.mocked(db.booking.findMany).mockResolvedValue([mockBookingConfirmed] as never);
+    vi.mocked(db.booking.count).mockResolvedValue(1 as never);
 
     const res = await GET(new NextRequest("http://localhost/api/bookings"));
     expect(res.status).toBe(200);
@@ -141,6 +144,7 @@ describe("GET /api/bookings", () => {
   test("ADMIN recebe todas sem filtro de userId", async () => {
     vi.mocked(auth).mockResolvedValue(adminSession as never);
     vi.mocked(db.booking.findMany).mockResolvedValue([mockBookingPending, mockBookingConfirmed] as never);
+    vi.mocked(db.booking.count).mockResolvedValue(2 as never);
 
     const res = await GET(new NextRequest("http://localhost/api/bookings"));
     expect(res.status).toBe(200);

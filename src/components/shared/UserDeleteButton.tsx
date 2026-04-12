@@ -3,6 +3,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 
 interface UserDeleteButtonProps {
@@ -11,9 +12,8 @@ interface UserDeleteButtonProps {
 }
 
 export function UserDeleteButton({ userId, isSelf }: UserDeleteButtonProps) {
-  const router = useRouter();
+  const router  = useRouter();
   const [loading, setLoading] = useState(false);
-  const [error, setError]     = useState<string | null>(null);
 
   // Não renderiza se é o próprio usuário logado
   if (isSelf) return null;
@@ -25,24 +25,22 @@ export function UserDeleteButton({ userId, isSelf }: UserDeleteButtonProps) {
     setLoading(false);
 
     if (res.ok) {
+      toast.success("Usuário apagado.");
       router.push("/dashboard/admin/users");
     } else {
       const json = await res.json().catch(() => ({}));
-      setError(json.error ?? "Erro ao apagar usuário.");
+      toast.error(json.error ?? "Erro ao apagar usuário.");
     }
   }
 
   return (
-    <div className="flex flex-col items-end gap-1">
-      <Button
-        variant="outline"
-        onClick={handleDelete}
-        disabled={loading}
-        className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700 shrink-0"
-      >
-        {loading ? "Apagando..." : "Apagar usuário"}
-      </Button>
-      {error && <p className="text-xs text-red-500 text-right">{error}</p>}
-    </div>
+    <Button
+      variant="outline"
+      onClick={handleDelete}
+      disabled={loading}
+      className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700 shrink-0"
+    >
+      {loading ? "Apagando..." : "Apagar usuário"}
+    </Button>
   );
 }

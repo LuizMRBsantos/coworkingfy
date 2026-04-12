@@ -5,41 +5,54 @@ import { db } from "@/lib/db";
 import { Button } from "@/components/ui/button";
 import { TicketCard } from "@/components/shared/TicketCard";
 import { TicketFilters } from "@/components/shared/TicketFilters";
+import { Pagination } from "@/components/shared/Pagination";
+import { PAGE_SIZE } from "@/lib/constants";
 import { Plus } from "lucide-react";
 import type { TicketStatus } from "@prisma/client";
 
 interface PageProps {
-  searchParams: Promise<{ status?: string; unitId?: string }>;
+  searchParams: Promise<{ status?: string; unitId?: string; page?: string }>;
 }
 
 export default async function TicketsPage({ searchParams }: PageProps) {
   const session = await auth();
   if (!session) redirect("/login");
 
-  const { status, unitId } = await searchParams;
+  const { status, unitId, page: pageParam } = await searchParams;
 
-  const role = session.user.role;
+  const role    = session.user.role;
   if (role === "MEMBER") redirect("/dashboard");
 
-  // RECEPTIONIST vê só suas unidades — ignora ?unitId= da URL
   const unitFilter = role === "ADMIN" ? unitId : undefined;
-  const unitIds = session.user.unitIds;
+  const unitIds    = session.user.unitIds;
+  const page       = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
+  const skip       = (page - 1) * PAGE_SIZE;
 
-  const [tickets, units] = await Promise.all([
+  const where = {
+    ...(unitFilter ? { unitId: unitFilter } : role === "RECEPTIONIST" ? { unitId: { in: unitIds } } : {}),
+    ...(status ? { status: status as TicketStatus } : {}),
+  };
+
+  const [tickets, total, units] = await Promise.all([
     db.ticket.findMany({
-      where: {
-        ...(unitFilter ? { unitId: unitFilter } : role === "RECEPTIONIST" ? { unitId: { in: unitIds } } : {}),
-        ...(status ? { status: status as TicketStatus } : {}),
-      },
+      where,
       orderBy: { createdAt: "desc" },
+      skip,
+      take: PAGE_SIZE,
       include: {
         unit:      { select: { id: true, name: true } },
         createdBy: { select: { id: true, name: true } },
         _count:    { select: { serviceOrders: true } },
       },
     }),
+    db.ticket.count({ where }),
     db.unit.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
   ]);
+
+  const totalPages = Math.ceil(total / PAGE_SIZE);
+  const sp: Record<string, string> = {};
+  if (status) sp.status = status;
+  if (unitId) sp.unitId = unitId;
 
   return (
     <div className="space-y-6">
@@ -47,7 +60,7 @@ export default async function TicketsPage({ searchParams }: PageProps) {
         <div>
           <h1 className="text-2xl font-semibold text-gray-900">Tickets / SLA</h1>
           <p className="text-sm text-gray-500 mt-1">
-            {tickets.length} ticket{tickets.length !== 1 ? "s" : ""} encontrado{tickets.length !== 1 ? "s" : ""}
+            {total} ticket{total !== 1 ? "s" : ""} encontrado{total !== 1 ? "s" : ""}
           </p>
         </div>
         {role === "ADMIN" && (
@@ -76,6 +89,8 @@ export default async function TicketsPage({ searchParams }: PageProps) {
           tickets.map((ticket) => <TicketCard key={ticket.id} ticket={ticket} />)
         )}
       </div>
+
+      <Pagination page={page} totalPages={totalPages} searchParams={sp} />
     </div>
   );
 }

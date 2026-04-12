@@ -6,7 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ServiceOrderCard } from "@/components/shared/ServiceOrderCard";
 import { TicketActions } from "@/components/shared/TicketActions";
-import { Building2, Hash, Plus } from "lucide-react";
+import { ActivityTimeline } from "@/components/shared/ActivityTimeline";
+import { Building2, Hash, Plus, Clock, CheckCircle2, AlertCircle } from "lucide-react";
 import type { Priority, TicketStatus } from "@prisma/client";
 
 interface PageProps {
@@ -14,15 +15,17 @@ interface PageProps {
 }
 
 const STATUS_LABEL: Record<TicketStatus, string> = {
-  OPEN:        "Aberto",
-  IN_PROGRESS: "Em andamento",
-  CLOSED:      "Fechado",
+  OPEN:          "Aberto",
+  IN_PROGRESS:   "Em andamento",
+  PENDING_CLOSE: "Aguardando fechamento",
+  CLOSED:        "Fechado",
 };
 
 const STATUS_CLASS: Record<TicketStatus, string> = {
-  OPEN:        "bg-blue-100 text-blue-800 hover:bg-blue-100",
-  IN_PROGRESS: "bg-yellow-100 text-yellow-800 hover:bg-yellow-100",
-  CLOSED:      "bg-green-100 text-green-800 hover:bg-green-100",
+  OPEN:          "bg-blue-100 text-blue-800 hover:bg-blue-100",
+  IN_PROGRESS:   "bg-yellow-100 text-yellow-800 hover:bg-yellow-100",
+  PENDING_CLOSE: "bg-purple-100 text-purple-800 hover:bg-purple-100",
+  CLOSED:        "bg-green-100 text-green-800 hover:bg-green-100",
 };
 
 const PRIORITY_LABEL: Record<Priority, string> = {
@@ -38,6 +41,60 @@ const PRIORITY_CLASS: Record<Priority, string> = {
   HIGH:   "bg-orange-100 text-orange-700 hover:bg-orange-100",
   URGENT: "bg-red-100 text-red-700 hover:bg-red-100",
 };
+
+function SlaIndicator({
+  label,
+  deadline,
+  doneAt,
+}: {
+  label:    string;
+  deadline: Date | null;
+  doneAt:   Date | null;
+}) {
+  if (!deadline) return null;
+
+  const now       = new Date();
+  const isBreached = !doneAt && deadline < now;
+  const isDone     = !!doneAt;
+
+  if (isDone) {
+    const onTime = doneAt <= deadline;
+    return (
+      <div className="flex items-center gap-1.5 text-sm">
+        <CheckCircle2 className={`h-4 w-4 ${onTime ? "text-green-500" : "text-red-500"}`} />
+        <span className={onTime ? "text-green-700" : "text-red-700"}>
+          {label}: {onTime ? "Dentro do prazo" : "Fora do prazo"}
+        </span>
+      </div>
+    );
+  }
+
+  if (isBreached) {
+    return (
+      <div className="flex items-center gap-1.5 text-sm">
+        <AlertCircle className="h-4 w-4 text-red-500" />
+        <span className="text-red-700">
+          {label}: Vencido em{" "}
+          {new Date(deadline).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
+        </span>
+      </div>
+    );
+  }
+
+  const diffMs   = deadline.getTime() - now.getTime();
+  const diffH    = Math.floor(diffMs / (1000 * 60 * 60));
+  const diffMin  = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+  const timeLeft = diffH > 0 ? `${diffH}h ${diffMin}min` : `${diffMin}min`;
+
+  return (
+    <div className="flex items-center gap-1.5 text-sm">
+      <Clock className="h-4 w-4 text-yellow-500" />
+      <span className="text-yellow-700">
+        {label}: Vence em {timeLeft}
+      </span>
+    </div>
+  );
+}
 
 export default async function TicketDetailPage({ params }: PageProps) {
   const session = await auth();
@@ -71,10 +128,22 @@ export default async function TicketDetailPage({ params }: PageProps) {
     redirect("/dashboard/admin/tickets");
   }
 
+  // Para o SLA de atendimento, considera "atendido" quando existe pelo menos 1 OS em progresso
+  const firstActiveOs = ticket.serviceOrders.find(
+    (os) => ["IN_PROGRESS", "DONE", "VALIDATED"].includes(os.status),
+  );
+  const attendanceDoneAt = firstActiveOs?.createdAt ?? null;
+
+  // Para o SLA de resolução, considera "resolvido" quando ticket está CLOSED
+  const resolutionDoneAt = ticket.status === "CLOSED" ? ticket.updatedAt : null;
+
+  // Ocultar botão Nova OS quando ticket está fechado ou pedindo fechamento
+  const canCreateOs = !["CLOSED", "PENDING_CLOSE"].includes(ticket.status);
+
   return (
     <div className="space-y-8">
       {/* Cabeçalho */}
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex items-start justify-between gap-4 flex-wrap">
         <div className="space-y-2">
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-mono text-lg font-bold text-gray-900">{ticket.number}</span>
@@ -94,15 +163,40 @@ export default async function TicketDetailPage({ params }: PageProps) {
         </div>
 
         <div className="flex flex-col items-end gap-2">
-          <TicketActions ticketId={id} status={ticket.status} role={role} />
-          <Link href={`/dashboard/admin/tickets/${id}/service-orders/new`}>
-            <Button variant="outline">
-              <Plus className="h-4 w-4 mr-2" />
-              Nova OS
-            </Button>
-          </Link>
+          <TicketActions
+            ticketId={id}
+            status={ticket.status}
+            role={role}
+            unitId={ticket.unitId}
+            unitIds={unitIds}
+          />
+          {canCreateOs && (
+            <Link href={`/dashboard/admin/tickets/${id}/service-orders/new`}>
+              <Button variant="outline" size="sm">
+                <Plus className="h-4 w-4 mr-1" />
+                Nova OS
+              </Button>
+            </Link>
+          )}
         </div>
       </div>
+
+      {/* SLA do Ticket */}
+      {(ticket.slaAttendanceDeadline || ticket.slaResolutionDeadline) && (
+        <div className="bg-gray-50 border border-gray-100 rounded-lg p-4 space-y-2">
+          <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">SLA do chamado</p>
+          <SlaIndicator
+            label="Atendimento (1ª OS)"
+            deadline={ticket.slaAttendanceDeadline}
+            doneAt={attendanceDoneAt ? new Date(attendanceDoneAt) : null}
+          />
+          <SlaIndicator
+            label="Resolução (fechamento)"
+            deadline={ticket.slaResolutionDeadline}
+            doneAt={resolutionDoneAt ? new Date(resolutionDoneAt) : null}
+          />
+        </div>
+      )}
 
       {/* Descrição */}
       <div className="space-y-1">
@@ -142,6 +236,11 @@ export default async function TicketDetailPage({ params }: PageProps) {
             ))}
           </div>
         )}
+      </div>
+
+      {/* Histórico de eventos do ticket */}
+      <div className="bg-gray-50 border border-gray-100 rounded-lg p-4">
+        <ActivityTimeline entityType="TICKET" entityId={id} />
       </div>
     </div>
   );

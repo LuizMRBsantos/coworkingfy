@@ -46,6 +46,7 @@ enum BookingStatus {
 enum TicketStatus {
   OPEN
   IN_PROGRESS
+  PENDING_CLOSE // gestor solicitou fechamento — aguarda admin validar
   CLOSED
 }
 
@@ -55,6 +56,7 @@ enum ServiceOrderStatus {
   APPROVED
   IN_PROGRESS
   DONE
+  VALIDATED
   REJECTED
   CANCELLED
 }
@@ -83,21 +85,85 @@ enum ProviderStatus {
   INACTIVE
 }
 
+enum AssetType {
+  // Legado (mantidos para compatibilidade)
+  AC
+  ELECTRONIC
+  HYDRAULIC
+  CLEANING
+  // Categorias ampliadas
+  HVAC           // Ar-condicionado, ventilação, exaustão
+  FIRE_SAFETY    // Extintores, mangueiras, sprinklers
+  ELECTRICAL     // Quadros, nobreaks, geradores
+  PLUMBING       // Bombas, caixas d'água, cisternas
+  ELEVATOR
+  APPLIANCE      // Geladeira, micro-ondas, cafeteira
+  IT_INFRA       // Roteadores, câmeras, switches
+  FURNITURE
+  OTHER
+}
+
+enum AssetStatus {
+  ACTIVE
+  INACTIVE
+  MAINTENANCE
+  UNDER_MAINTENANCE  // em manutenção (ex-MAINTENANCE alias explícito)
+  DECOMMISSIONED     // baixado/descartado
+}
+
+enum PurchaseCategory {
+  CLEANING        // Limpeza
+  COFFEE          // Café
+  OFFICE_SUPPLIES // Material de escritório
+}
+
+enum PlanFrequency {
+  DAILY
+  WEEKLY
+  MONTHLY
+  QUARTERLY
+  SEMI_ANNUALLY
+  ANNUALLY
+}
+
+enum ActivityEntityType {
+  TICKET
+  SERVICE_ORDER
+}
+
+enum UnitChecklistItemType {
+  UNIT_CONTRACT        // Contrato da unidade
+  CLEANING_CONTRACT    // Contrato de terceirizado de limpeza
+  INTERNET_CONTRACT    // Contrato de internet
+  EQUIPMENT_INVENTORY  // Inventário de equipamentos (auto + documento opcional)
+  LEASE_CONTRACT       // Contrato de locação do imóvel
+  PRINTER_CONTRACT     // Contrato de impressora
+}
+
 // ---------------------------------------------------------------------------
 // Models
 // ---------------------------------------------------------------------------
 
 model Unit {
-  id        String   @id @default(cuid())
-  name      String
-  type      UnitType
-  createdAt DateTime @default(now())
+  id            String   @id @default(cuid())
+  name          String
+  type          UnitType
+  address       String?
+  clientName    String?
+  clientContact String?
+  lat           Decimal? // latitude — usado para validação de geolocalização do prestador
+  lng           Decimal? // longitude — usado para validação de geolocalização do prestador
+  createdAt     DateTime @default(now())
 
-  userUnits     UserUnit[]
-  spaces        Space[]
-  tickets       Ticket[]
-  serviceOrders ServiceOrder[]
-  providers     Provider[]
+  userUnits            UserUnit[]
+  spaces               Space[]
+  tickets              Ticket[]
+  serviceOrders        ServiceOrder[]
+  providers            Provider[]
+  assets               Asset[]
+  maintenancePlans     MaintenancePlan[]
+  purchases            Purchase[]
+  unitChecklistItems   UnitChecklistItem[]
 
   @@map("units")
 }
@@ -114,12 +180,14 @@ model User {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  userUnits             UserUnit[]
-  bookings              Booking[]
-  bookingsApproved      Booking[]      @relation("BookingApprovedBy")
-  ticketsCreated        Ticket[]       @relation("TicketCreatedBy")
-  serviceOrdersCreated  ServiceOrder[] @relation("ServiceOrderCreatedBy")
-  serviceOrdersApproved ServiceOrder[] @relation("ServiceOrderApprovedBy")
+  userUnits                    UserUnit[]
+  bookings                     Booking[]
+  bookingsApproved             Booking[]               @relation("BookingApprovedBy")
+  ticketsCreated               Ticket[]                @relation("TicketCreatedBy")
+  serviceOrdersCreated         ServiceOrder[]          @relation("ServiceOrderCreatedBy")
+  serviceOrdersApproved        ServiceOrder[]          @relation("ServiceOrderApprovedBy")
+  serviceOrderAttachmentsUploaded ServiceOrderAttachment[]
+  purchases                        Purchase[]
 
   // NextAuth v5
   accounts Account[]
@@ -153,9 +221,11 @@ model Space {
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 
-  unit          Unit           @relation(fields: [unitId], references: [id])
-  bookings      Booking[]
-  serviceOrders ServiceOrder[]
+  unit             Unit              @relation(fields: [unitId], references: [id])
+  bookings         Booking[]
+  serviceOrders    ServiceOrder[]
+  assets           Asset[]
+  maintenancePlans MaintenancePlan[]
 
   @@index([unitId])
   @@map("spaces")
@@ -185,16 +255,20 @@ model Booking {
 }
 
 model Ticket {
-  id               String       @id @default(cuid())
-  number           String       @unique // TK-2026-0001
-  externalTicketId String?               // número no sistema do cliente (ex: TICK-2026-0847)
-  unitId           String
-  description      String
-  priority         Priority
-  status           TicketStatus @default(OPEN)
-  createdById      String
-  createdAt        DateTime     @default(now())
-  updatedAt        DateTime     @updatedAt
+  id                    String       @id @default(cuid())
+  number                String       @unique // TK-2026-0001
+  externalTicketId      String?               // número no sistema do cliente (ex: TICK-2026-0847)
+  unitId                String
+  description           String
+  priority              Priority
+  status                TicketStatus @default(OPEN)
+  slaAttendanceDeadline DateTime?             // prazo p/ gestor criar 1ª OS (horas úteis)
+  slaResolutionDeadline DateTime?             // prazo p/ ticket ser fechado (horas úteis)
+  startedAt             DateTime?             // setado quando status → IN_PROGRESS
+  resolvedAt            DateTime?             // setado quando status → CLOSED
+  createdById           String
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
 
   unit          Unit           @relation(fields: [unitId], references: [id])
   createdBy     User           @relation("TicketCreatedBy", fields: [createdById], references: [id])
@@ -207,37 +281,70 @@ model Ticket {
 }
 
 model ServiceOrder {
-  id            String             @id @default(cuid())
-  number        String             @unique // OS-2026-0001
-  ticketId      String
-  unitId        String             // herdado do ticket — mantido para queries eficientes por unidade
-  spaceId       String?            // opcional — OS do coworking pode ter espaço afetado
-  createdById   String
-  providerId    String?            // opcional — pode ser definido após aprovação
-  approvedById  String?
-  serviceType   ServiceType
-  description   String
-  status        ServiceOrderStatus @default(DRAFT)
-  scheduledDate DateTime?
-  value         Decimal?
-  photos        String[]           @default([])
-  approvedAt    DateTime?
-  slaDeadline   DateTime?          // calculado na aprovação usando ticket.priority
-  createdAt     DateTime           @default(now())
-  updatedAt     DateTime           @updatedAt
+  id                    String             @id @default(cuid())
+  number                String             @unique // OS-2026-0001
+  ticketId              String?            // null para OS preventiva gerada pelo motor de manutenção
+  unitId                String             // herdado do ticket — mantido para queries eficientes por unidade
+  spaceId               String?            // opcional — OS do coworking pode ter espaço afetado
+  assetId               String?            // opcional — vincula a OS a um equipamento/ativo específico
+  maintenancePlanId     String?            // preenchido quando gerada pelo motor preventivo
+  createdById           String
+  providerId            String?            // opcional — pode ser definido após aprovação
+  approvedById          String?
+  serviceType           ServiceType
+  description           String
+  status                ServiceOrderStatus @default(DRAFT)
+  scheduledDate         DateTime?
+  value                 Decimal?
+  photos                String[]           @default([])
+  isRemote              Boolean            @default(false)
+  specialInstructions   String?
+  executionReport       String?
+  cancellationReason    String?
+  approvedAt            DateTime?
+  startedAt             DateTime?          // setado ao entrar em IN_PROGRESS
+  completedAt           DateTime?          // setado ao entrar em DONE
+  cancelledAt           DateTime?          // setado ao entrar em CANCELLED
+  validatedAt           DateTime?          // setado ao entrar em VALIDATED
+  slaAttendanceDeadline DateTime?          // prazo de atendimento (1ª ação) em horas úteis
+  slaResolutionDeadline DateTime?          // prazo de resolução em horas úteis
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
 
-  ticket     Ticket    @relation(fields: [ticketId], references: [id])
-  unit       Unit      @relation(fields: [unitId], references: [id])
-  space      Space?    @relation(fields: [spaceId], references: [id])
-  createdBy  User      @relation("ServiceOrderCreatedBy", fields: [createdById], references: [id])
-  provider   Provider? @relation(fields: [providerId], references: [id])
-  approvedBy User?     @relation("ServiceOrderApprovedBy", fields: [approvedById], references: [id])
+  ticket          Ticket?          @relation(fields: [ticketId], references: [id])
+  maintenancePlan MaintenancePlan? @relation(fields: [maintenancePlanId], references: [id])
+  unit            Unit             @relation(fields: [unitId], references: [id])
+  space       Space?    @relation(fields: [spaceId], references: [id])
+  asset       Asset?    @relation(fields: [assetId], references: [id])
+  createdBy   User      @relation("ServiceOrderCreatedBy", fields: [createdById], references: [id])
+  provider    Provider? @relation(fields: [providerId], references: [id])
+  approvedBy  User?     @relation("ServiceOrderApprovedBy", fields: [approvedById], references: [id])
+  checklists     ServiceOrderChecklistItem[]
+  attachments    ServiceOrderAttachment[]
+  providerToken  ProviderToken?
 
   @@index([ticketId])
   @@index([unitId])
+  @@index([assetId])
+  @@index([maintenancePlanId])
   @@index([createdById])
   @@index([status])
   @@map("service_orders")
+}
+
+model ServiceOrderAttachment {
+  id             String   @id @default(cuid())
+  serviceOrderId String
+  name           String
+  url            String
+  uploadedById   String
+  createdAt      DateTime @default(now())
+
+  serviceOrder ServiceOrder @relation(fields: [serviceOrderId], references: [id], onDelete: Cascade)
+  uploadedBy   User         @relation(fields: [uploadedById], references: [id])
+
+  @@index([serviceOrderId])
+  @@map("service_order_attachments")
 }
 
 model Provider {
@@ -251,11 +358,166 @@ model Provider {
   status    ProviderStatus @default(ACTIVE)
   createdAt DateTime       @default(now())
 
-  unit          Unit           @relation(fields: [unitId], references: [id])
-  serviceOrders ServiceOrder[]
+  unit             Unit              @relation(fields: [unitId], references: [id])
+  serviceOrders    ServiceOrder[]
+  maintenancePlans MaintenancePlan[]
 
   @@index([unitId])
   @@map("providers")
+}
+
+model Asset {
+  id                String      @id @default(cuid())
+  unitId            String
+  spaceId           String?
+  code              String      @unique // etiqueta física ex: AC-001
+  name              String
+  description       String?
+  type              AssetType
+  brand             String?     // fabricante
+  assetModel        String?     // modelo do equipamento
+  serialNumber      String?
+  purchasedAt       DateTime?
+  warrantyExpiresAt DateTime?
+  notes             String?
+  status            AssetStatus @default(ACTIVE)
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  unit             Unit              @relation(fields: [unitId], references: [id])
+  space            Space?            @relation(fields: [spaceId], references: [id])
+  serviceOrders    ServiceOrder[]
+  maintenancePlans MaintenancePlan[]
+
+  @@index([unitId])
+  @@index([spaceId])
+  @@map("assets")
+}
+
+model MaintenancePlan {
+  id          String        @id @default(cuid())
+  unitId      String
+  assetId     String?
+  spaceId     String?       // pode vincular direto ao espaço se não houver ativo específico
+  providerId  String?       // prestador padrão — atribuído à OS gerada pelo cron
+  name        String
+  description String?
+  frequency   PlanFrequency
+  serviceType ServiceType
+  priority    Priority      @default(MEDIUM)
+  lastRunAt   DateTime?
+  nextRunAt   DateTime
+  isActive    Boolean       @default(true)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  unit          Unit                @relation(fields: [unitId], references: [id])
+  asset         Asset?              @relation(fields: [assetId], references: [id])
+  space         Space?              @relation(fields: [spaceId], references: [id])
+  provider      Provider?           @relation(fields: [providerId], references: [id])
+  checklists    PlanChecklistItem[]
+  serviceOrders ServiceOrder[]
+
+  @@index([unitId])
+  @@index([assetId])
+  @@index([spaceId])
+  @@index([providerId])
+  @@map("maintenance_plans")
+}
+
+model PlanChecklistItem {
+  id         String  @id @default(cuid())
+  planId     String
+  item       String
+  isRequired Boolean @default(true)
+
+  plan MaintenancePlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@index([planId])
+  @@map("plan_checklist_items")
+}
+
+model ServiceOrderChecklistItem {
+  id             String    @id @default(cuid())
+  serviceOrderId String
+  item           String
+  isCompleted    Boolean   @default(false)
+  completedAt    DateTime?
+
+  serviceOrder ServiceOrder @relation(fields: [serviceOrderId], references: [id], onDelete: Cascade)
+
+  @@index([serviceOrderId])
+  @@map("service_order_checklist_items")
+}
+
+model Purchase {
+  id          String           @id @default(cuid())
+  unitId      String
+  category    PurchaseCategory
+  description String
+  value       Decimal          @db.Decimal(10, 2)
+  purchasedAt DateTime         @default(now())
+  createdById String
+  notes       String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  unit      Unit @relation(fields: [unitId], references: [id])
+  createdBy User @relation(fields: [createdById], references: [id])
+
+  @@index([unitId])
+  @@index([category])
+  @@index([purchasedAt])
+  @@map("purchases")
+}
+
+model UnitChecklistItem {
+  id          String                @id @default(cuid())
+  unitId      String
+  itemType    UnitChecklistItemType
+  documentUrl String?               // path no Supabase Storage (bucket unit-documents, privado)
+  fileName    String?
+  uploadedAt  DateTime?
+  notes       String?
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+
+  unit Unit @relation(fields: [unitId], references: [id], onDelete: Cascade)
+
+  @@unique([unitId, itemType])
+  @@index([unitId])
+  @@map("unit_checklist_items")
+}
+
+model ProviderToken {
+  id             String    @id @default(cuid())
+  serviceOrderId String    @unique
+  token          String    @unique @default(cuid())
+  expiresAt      DateTime  // +7 dias da criação
+  usedAt         DateTime?
+  createdAt      DateTime  @default(now())
+
+  serviceOrder ServiceOrder @relation(fields: [serviceOrderId], references: [id], onDelete: Cascade)
+
+  @@map("provider_tokens")
+}
+
+model ActivityLog {
+  id              String             @id @default(cuid())
+  entityType      ActivityEntityType
+  entityId        String
+  action          String             // ex: STATUS_CHANGED, CREATED, APPROVED, CHECKIN, CHECKOUT
+  fromStatus      String?            // status anterior (snapshot)
+  toStatus        String?            // status novo (snapshot)
+  performedById   String?            // null para ações do sistema (cron, provider via token)
+  performedByName String?            // snapshot do nome no momento do log (imutável)
+  lat             Decimal?           // geolocalização capturada no momento da ação
+  lng             Decimal?
+  metadata        Json?              // dados contextuais extras (ex: token usado, distância calculada)
+  createdAt       DateTime           @default(now())
+
+  @@index([entityType, entityId])
+  @@map("activity_logs")
 }
 
 // ---------------------------------------------------------------------------

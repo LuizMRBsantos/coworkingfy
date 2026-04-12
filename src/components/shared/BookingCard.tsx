@@ -11,10 +11,10 @@ const STATUS_LABEL: Record<BookingStatus, string> = {
 };
 
 const STATUS_CLASS: Record<BookingStatus, string> = {
-  PENDING_APPROVAL: "bg-yellow-100 text-yellow-800 hover:bg-yellow-100",
-  CONFIRMED:        "bg-green-100 text-green-700 hover:bg-green-100",
-  CANCELLED:        "bg-red-100 text-red-700 hover:bg-red-100",
-  REJECTED:         "bg-red-100 text-red-700 hover:bg-red-100",
+  PENDING_APPROVAL: "bg-amber-100 text-amber-700 hover:bg-amber-200 border-none",
+  CONFIRMED:        "bg-emerald-100 text-emerald-700 hover:bg-emerald-200 border-none",
+  CANCELLED:        "bg-gray-100 text-gray-600 hover:bg-gray-200 border-none",
+  REJECTED:         "bg-rose-100 text-rose-700 hover:bg-rose-200 border-none",
 };
 
 const TYPE_LABEL: Record<SpaceType, string> = {
@@ -54,16 +54,16 @@ export function BookingCard({ booking, showUser = false, actions }: BookingCardP
   const isDimmed  = booking.status === "CANCELLED" || booking.status === "REJECTED";
 
   return (
-    <Card className={`transition-colors ${isDimmed ? "opacity-60" : ""}`}>
-      <CardContent className="p-4">
-        <div className="flex items-start justify-between gap-4">
+    <Card className={`transition-colors shadow-sm border-gray-200 ${isDimmed ? "opacity-60" : ""}`}>
+      <CardContent className="p-5">
+        <div className="flex items-center justify-between gap-4">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-medium text-gray-900">{booking.space.name}</span>
-              <Badge variant="outline">{TYPE_LABEL[booking.space.type]}</Badge>
-              <Badge className={STATUS_CLASS[booking.status]}>{STATUS_LABEL[booking.status]}</Badge>
+              <span className="font-semibold text-gray-900">{booking.space.name}</span>
+              <Badge variant="outline" className="font-medium bg-transparent border-gray-200 text-gray-600 hover:bg-gray-50">{TYPE_LABEL[booking.space.type]}</Badge>
+              <Badge className={`font-medium rounded-full ${STATUS_CLASS[booking.status]}`}>{STATUS_LABEL[booking.status]}</Badge>
               {isPast && booking.status === "CONFIRMED" && (
-                <Badge className="bg-gray-100 text-gray-500 hover:bg-gray-100">Concluída</Badge>
+                <Badge className="font-medium rounded-full bg-zinc-100 text-zinc-500 hover:bg-zinc-200">Concluída</Badge>
               )}
             </div>
 

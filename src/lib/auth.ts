@@ -2,8 +2,10 @@ import NextAuth, { DefaultSession } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
+import { headers } from "next/headers";
 import type { Role } from "@prisma/client";
 import { db } from "./db";
+import { checkRateLimit, clearRateLimit } from "./rate-limit";
 
 // ---------------------------------------------------------------------------
 // Augmentação de tipos — expõe role e unitIds no objeto session.user
@@ -53,6 +55,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         const { email, password } = parsed.data;
 
+        // Rate limiting: 5 tentativas por email em 15 minutos
+        const headersList = await headers();
+        const ip    = headersList.get("x-forwarded-for") ?? headersList.get("x-real-ip") ?? "unknown";
+        const rlKey = `login:${ip}:${email}`;
+        const rl    = await checkRateLimit(rlKey, { limit: 5, windowMs: 15 * 60 * 1000 });
+
+        if (!rl.allowed) {
+          throw new Error("RATE_LIMIT");
+        }
+
         const user = await db.user.findUnique({
           where: { email },
           select: {
@@ -71,6 +83,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         const passwordValid = await bcrypt.compare(password, user.password);
         if (!passwordValid) return null;
+
+        // Login bem-sucedido — zera o contador de tentativas
+        await clearRateLimit(rlKey);
 
         return {
           id: user.id,

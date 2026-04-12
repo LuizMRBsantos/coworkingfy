@@ -5,8 +5,14 @@ import { db } from "@/lib/db";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Pagination } from "@/components/shared/Pagination";
+import { PAGE_SIZE } from "@/lib/constants";
 import { Plus, Building2 } from "lucide-react";
 import type { Role } from "@prisma/client";
+
+interface PageProps {
+  searchParams: Promise<{ page?: string }>;
+}
 
 const ROLE_LABEL: Record<Role, string> = {
   ADMIN:        "Admin",
@@ -20,18 +26,29 @@ const ROLE_CLASS: Record<Role, string> = {
   MEMBER:       "bg-gray-100 text-gray-600 hover:bg-gray-100",
 };
 
-export default async function UsersPage() {
+export default async function UsersPage({ searchParams }: PageProps) {
   const session = await auth();
   if (!session) redirect("/login");
   if (session.user.role !== "ADMIN") redirect("/dashboard");
 
-  const users = await db.user.findMany({
-    orderBy: { createdAt: "desc" },
-    select: {
-      id: true, name: true, email: true, role: true, active: true,
-      userUnits: { select: { unit: { select: { id: true, name: true } } } },
-    },
-  });
+  const { page: pageParam } = await searchParams;
+  const page = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
+  const skip = (page - 1) * PAGE_SIZE;
+
+  const [users, total] = await Promise.all([
+    db.user.findMany({
+      orderBy: { createdAt: "desc" },
+      skip,
+      take: PAGE_SIZE,
+      select: {
+        id: true, name: true, email: true, role: true, active: true,
+        userUnits: { select: { unit: { select: { id: true, name: true } } } },
+      },
+    }),
+    db.user.count(),
+  ]);
+
+  const totalPages = Math.ceil(total / PAGE_SIZE);
 
   return (
     <div className="space-y-6">
@@ -39,7 +56,7 @@ export default async function UsersPage() {
         <div>
           <h1 className="text-2xl font-semibold text-gray-900">Usuários</h1>
           <p className="text-sm text-gray-500 mt-1">
-            {users.length} usuário{users.length !== 1 ? "s" : ""} cadastrado{users.length !== 1 ? "s" : ""}
+            {total} usuário{total !== 1 ? "s" : ""} cadastrado{total !== 1 ? "s" : ""}
           </p>
         </div>
         <Link href="/dashboard/admin/users/new">
@@ -85,6 +102,8 @@ export default async function UsersPage() {
           ))
         )}
       </div>
+
+      <Pagination page={page} totalPages={totalPages} searchParams={{}} />
     </div>
   );
 }

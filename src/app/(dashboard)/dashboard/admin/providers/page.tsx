@@ -4,11 +4,13 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { Button } from "@/components/ui/button";
 import { ProviderCard } from "@/components/shared/ProviderCard";
+import { Pagination } from "@/components/shared/Pagination";
+import { PAGE_SIZE } from "@/lib/constants";
 import { Plus } from "lucide-react";
 import type { ProviderType, ServiceType } from "@prisma/client";
 
 interface PageProps {
-  searchParams: Promise<{ type?: string; specialty?: string; unitId?: string }>;
+  searchParams: Promise<{ type?: string; specialty?: string; unitId?: string; page?: string }>;
 }
 
 export default async function AdminProvidersPage({ searchParams }: PageProps) {
@@ -16,23 +18,37 @@ export default async function AdminProvidersPage({ searchParams }: PageProps) {
   if (!session) redirect("/login");
   if (session.user.role !== "ADMIN") redirect("/dashboard");
 
-  const { type, specialty, unitId } = await searchParams;
+  const { type, specialty, unitId, page: pageParam } = await searchParams;
 
-  const [providers, units] = await Promise.all([
+  const page = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
+  const skip = (page - 1) * PAGE_SIZE;
+
+  const where = {
+    ...(unitId    ? { unitId }                                : {}),
+    ...(type      ? { type:      type      as ProviderType }  : {}),
+    ...(specialty ? { specialty: specialty as ServiceType }   : {}),
+  };
+
+  const [providers, total, units] = await Promise.all([
     db.provider.findMany({
-      where: {
-        ...(unitId    ? { unitId }                          : {}),
-        ...(type      ? { type:      type      as ProviderType } : {}),
-        ...(specialty ? { specialty: specialty as ServiceType }  : {}),
-      },
+      where,
       orderBy: [{ name: "asc" }],
+      skip,
+      take: PAGE_SIZE,
       include: {
         unit:   { select: { id: true, name: true } },
         _count: { select: { serviceOrders: true } },
       },
     }),
+    db.provider.count({ where }),
     db.unit.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
   ]);
+
+  const totalPages = Math.ceil(total / PAGE_SIZE);
+  const sp: Record<string, string> = {};
+  if (type)      sp.type      = type;
+  if (specialty) sp.specialty = specialty;
+  if (unitId)    sp.unitId    = unitId;
 
   return (
     <div className="space-y-6">
@@ -40,7 +56,7 @@ export default async function AdminProvidersPage({ searchParams }: PageProps) {
         <div>
           <h1 className="text-2xl font-semibold text-gray-900">Prestadores</h1>
           <p className="text-sm text-gray-500 mt-1">
-            {providers.length} prestador{providers.length !== 1 ? "es" : ""} cadastrado{providers.length !== 1 ? "s" : ""}
+            {total} prestador{total !== 1 ? "es" : ""} cadastrado{total !== 1 ? "s" : ""}
           </p>
         </div>
         <Link href="/dashboard/admin/providers/new">
@@ -95,6 +111,8 @@ export default async function AdminProvidersPage({ searchParams }: PageProps) {
           ))
         )}
       </div>
+
+      <Pagination page={page} totalPages={totalPages} searchParams={sp} />
     </div>
   );
 }

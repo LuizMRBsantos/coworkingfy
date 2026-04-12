@@ -1,62 +1,60 @@
-import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { NextResponse } from "next/server";
 import { z } from "zod";
+import { Prisma, BookingStatus } from "@prisma/client";
+import { db } from "@/lib/db";
+import { withAuth } from "@/lib/rbac";
+import { AppError } from "@/lib/errors";
+import { OPEN_HOUR, CLOSE_HOUR, MIN_DURATION_MINUTES } from "@/lib/constants";
+import { getBusinessHour } from "@/lib/date-utils";
+import { CreateBookingSchema } from "@/lib/validations/booking";
 
-const OPEN_HOUR            = 7;
-const CLOSE_HOUR           = 22;
-const MIN_DURATION_MINUTES = 30;
+const StatusSchema = z.nativeEnum(BookingStatus).optional();
 
-const CreateBookingSchema = z.object({
-  spaceId:   z.string().min(1, "Espaço obrigatório"),
-  startTime: z.string().min(1, "Horário de início obrigatório"),
-  endTime:   z.string().min(1, "Horário de término obrigatório"),
+export const GET = withAuth(async (req, session) => {
+  const { role, unitIds, id: userId } = session.user;
+  const params     = req.nextUrl.searchParams;
+  const upcoming   = params.get("upcoming") === "true";
+  const unitFilter = role === "ADMIN" ? params.get("unitId") ?? undefined : undefined;
+
+  const statusParsed = StatusSchema.safeParse(params.get("status") ?? undefined);
+  const statusParam  = statusParsed.success ? statusParsed.data : undefined;
+
+  const page  = Math.max(1, parseInt(params.get("page")  ?? "1",  10) || 1);
+  const limit = Math.min(100, Math.max(1, parseInt(params.get("limit") ?? "20", 10) || 20));
+  const skip  = (page - 1) * limit;
+
+  const where: Prisma.BookingWhereInput = {
+    ...(role === "MEMBER"       ? { userId }                                              : {}),
+    ...(role === "RECEPTIONIST" ? { space: { unitId: { in: unitIds } } }                 : {}),
+    ...(unitFilter              ? { space: { unitId: unitFilter } }                       : {}),
+    ...(statusParam             ? { status: statusParam }                                 : {}),
+    ...(upcoming                ? { startTime: { gte: new Date() }, status: "CONFIRMED" } : {}),
+  };
+
+  const [bookings, total] = await Promise.all([
+    db.booking.findMany({
+      where,
+      orderBy: { startTime: "asc" },
+      skip,
+      take: limit,
+      include: {
+        space: {
+          select: {
+            id: true, name: true, type: true,
+            unit: { select: { id: true, name: true } },
+          },
+        },
+        user:       { select: { id: true, name: true, email: true } },
+        approvedBy: { select: { id: true, name: true } },
+      },
+    }),
+    db.booking.count({ where }),
+  ]);
+
+  return NextResponse.json({ data: bookings, meta: { total, page, limit, totalPages: Math.ceil(total / limit) } });
 });
 
-class BookingError extends Error {
-  constructor(public message: string, public code: string, public status: number) {
-    super(message);
-  }
-}
-
-export async function GET(req: NextRequest) {
-  const session = await auth();
-  if (!session) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
-
-  const { role, unitIds, id: userId } = session.user;
-  const params   = req.nextUrl.searchParams;
-  const upcoming = params.get("upcoming") === "true";
-  const unitFilter = role === "ADMIN" ? params.get("unitId") ?? undefined : undefined;
-  const statusParam = params.get("status");
-
-  const bookings = await db.booking.findMany({
-    where: {
-      ...(role === "MEMBER"       ? { userId }                                             : {}),
-      ...(role === "RECEPTIONIST" ? { space: { unitId: { in: unitIds } } }                : {}),
-      ...(unitFilter              ? { space: { unitId: unitFilter } }                      : {}),
-      ...(statusParam             ? { status: statusParam as "PENDING_APPROVAL" | "CONFIRMED" | "CANCELLED" | "REJECTED" } : {}),
-      ...(upcoming                ? { startTime: { gte: new Date() }, status: "CONFIRMED" } : {}),
-    },
-    orderBy: { startTime: "asc" },
-    include: {
-      space: {
-        select: {
-          id: true, name: true, type: true,
-          unit: { select: { id: true, name: true } },
-        },
-      },
-      user:       { select: { id: true, name: true, email: true } },
-      approvedBy: { select: { id: true, name: true } },
-    },
-  });
-
-  return NextResponse.json(bookings);
-}
-
-export async function POST(req: Request) {
-  const session = await auth();
-  if (!session) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
-
+export const POST = withAuth(async (req, session) => {
   const body   = await req.json();
   const parsed = CreateBookingSchema.safeParse(body);
   if (!parsed.success) {
@@ -71,8 +69,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Datas inválidas", code: "VALIDATION_ERROR" }, { status: 400 });
   }
 
-  const startHour = start.getHours() + start.getMinutes() / 60;
-  const endHour   = end.getHours()   + end.getMinutes()   / 60;
+  const startHour = getBusinessHour(start);
+  const endHour   = getBusinessHour(end);
   if (startHour < OPEN_HOUR || endHour > CLOSE_HOUR) {
     return NextResponse.json(
       { error: `Horário fora do funcionamento (${OPEN_HOUR}h–${CLOSE_HOUR}h)`, code: "OUT_OF_HOURS" },
@@ -107,11 +105,11 @@ export async function POST(req: Request) {
       const space = await tx.space.findUnique({ where: { id: spaceId } });
 
       if (!space)
-        throw new BookingError("Espaço não encontrado", "SPACE_NOT_FOUND", 404);
+        throw new AppError("Espaço não encontrado", "SPACE_NOT_FOUND", 404);
       if (space.status === "MAINTENANCE")
-        throw new BookingError("Espaço em manutenção, não aceita reservas", "SPACE_MAINTENANCE", 409);
+        throw new AppError("Espaço em manutenção, não aceita reservas", "SPACE_MAINTENANCE", 409);
       if (space.status === "INACTIVE")
-        throw new BookingError("Espaço inativo", "SPACE_INACTIVE", 409);
+        throw new AppError("Espaço inativo", "SPACE_INACTIVE", 409);
 
       // Conflito só é verificado na criação para STAFF — para MEMBER ocorre na aprovação
       if (isStaff) {
@@ -124,7 +122,7 @@ export async function POST(req: Request) {
           },
         });
         if (conflict)
-          throw new BookingError("Horário indisponível para este espaço", "CONFLICT", 409);
+          throw new AppError("Horário indisponível para este espaço", "CONFLICT", 409);
       }
 
       return tx.booking.create({
@@ -149,9 +147,9 @@ export async function POST(req: Request) {
 
     return NextResponse.json(booking, { status: 201 });
   } catch (e) {
-    if (e instanceof BookingError) {
+    if (e instanceof AppError) {
       return NextResponse.json({ error: e.message, code: e.code }, { status: e.status });
     }
     throw e;
   }
-}
+});
